@@ -1021,6 +1021,10 @@ function SelectionView({ state, error, items, presets, filter, type, nextCursor,
 }) {
   return <section className="h-full overflow-y-auto px-5 pb-8 pt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
     <h1 className="sr-only">비누 픽</h1>
+    <div className="mb-3">
+      <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-binu-muted">Binu Pick</p>
+      <p className="mt-1 text-sm font-bold leading-6 text-binu-navy">상황별 홈케어 선택지를 빠르게 비교해요</p>
+    </div>
     <div className="relative h-[166px] overflow-hidden rounded-[18px] border border-white/80 bg-white shadow-[0_18px_50px_rgba(46,75,102,0.12)]">
       <Image
         src="/binu/binu-pick-banner.png"
@@ -1057,7 +1061,7 @@ function CommunityView({ state, error, posts, tab, tags, tag, nextCursor, onTab,
   onTab: (tab: CommunityTab) => void; onTag: (tag: string) => void; onOpen: (id: string) => void; onMore: () => void;
 }) {
   return <section className="h-full overflow-y-auto px-5 pb-8 pt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-    <div className="mb-5"><p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-binu-muted">Community</p><h1 className="mt-2 text-[27px] font-black leading-[1.25] tracking-[-0.04em] text-binu-ink">막히는 청소 문제는<br />함께 해결해요</h1><p className="mt-3 text-sm font-medium leading-7 text-binu-text">글과 반응, 댓글까지 서버에 차곡차곡 저장됩니다.</p></div>
+    <div className="mb-5"><p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-binu-muted">Community</p><h1 className="mt-2 text-[27px] font-black leading-[1.25] tracking-[-0.04em] text-binu-ink">청소 문제는 함께 해결해요</h1></div>
     <div className="grid grid-cols-2 rounded-lg border border-binu-line bg-white p-1" role="tablist" aria-label="커뮤니티 분류"><Button className="w-full" variant={tab === "tips" ? "binu-soft" : "ghost"} role="tab" aria-selected={tab === "tips"} type="button" onClick={() => onTab("tips")}>꿀팁 공유</Button><Button className="w-full" variant={tab === "qa" ? "binu-soft" : "ghost"} role="tab" aria-selected={tab === "qa"} type="button" onClick={() => onTab("qa")}>Q&amp;A</Button></div>
     <div className="-mx-5 mt-4 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><Button className="shrink-0 rounded-full" variant={tag === "all" ? "binu" : "quiet"} size="sm" type="button" onClick={() => onTag("all")}>전체</Button>{tags.map((value) => <Button className="shrink-0 rounded-full" variant={tag === value ? "binu" : "quiet"} size="sm" key={value} type="button" onClick={() => onTag(value)}>#{value}</Button>)}</div>
     <DataState state={state} error={error} empty={!posts.length}>
