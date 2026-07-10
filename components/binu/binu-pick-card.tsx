@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Bookmark, Star } from "lucide-react";
+import { Bookmark, BookmarkCheck, ChevronRight, Star } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,11 @@ type BinuPickCardProps = {
   source: string;
   imageSrc?: string;
   tags: string[];
+  saved?: boolean;
+  saveLabel?: string;
+  openLabel?: string;
+  onSave?: () => void;
+  onOpen?: () => void;
   className?: string;
 };
 
@@ -26,6 +31,11 @@ export function BinuPickCard({
   source,
   imageSrc,
   tags,
+  saved = false,
+  saveLabel = "비누 노트에 저장",
+  openLabel,
+  onSave,
+  onOpen,
   className,
 }: BinuPickCardProps) {
   return (
@@ -75,10 +85,18 @@ export function BinuPickCard({
             </span>
           ))}
         </div>
-        <Button variant="binu-soft" className="w-full">
-          <Bookmark className="size-4" />
-          비누 노트에 저장
-        </Button>
+        <div className={cn("grid gap-2", openLabel && "grid-cols-2")}>
+          <Button variant={saved || !onSave ? "binu-soft" : "quiet"} className="w-full" onClick={onSave}>
+            {saved ? <BookmarkCheck className="size-4" aria-hidden="true" /> : <Bookmark className="size-4" aria-hidden="true" />}
+            {saved ? "저장됨" : saveLabel}
+          </Button>
+          {openLabel ? (
+            <Button variant="binu" className="w-full" onClick={onOpen}>
+              {openLabel}
+              <ChevronRight className="size-4" aria-hidden="true" />
+            </Button>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );

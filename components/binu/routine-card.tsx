@@ -1,4 +1,5 @@
-import { CalendarCheck2, ChevronRight } from "lucide-react";
+import Image from "next/image";
+import { CalendarCheck2, Check, ChevronRight, CircleHelp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,11 @@ type RoutineCardProps = {
   status: "due" | "soon" | "good" | "done";
   statusLabel: string;
   actionLabel?: string;
+  secondaryLabel?: string;
+  iconSrc?: string;
+  busy?: boolean;
+  onAction?: () => void;
+  onSecondaryAction?: () => void;
   className?: string;
 };
 
@@ -32,6 +38,11 @@ export function RoutineCard({
   status,
   statusLabel,
   actionLabel = "루틴 확인하기",
+  secondaryLabel,
+  iconSrc,
+  busy = false,
+  onAction,
+  onSecondaryAction,
   className,
 }: RoutineCardProps) {
   return (
@@ -43,8 +54,12 @@ export function RoutineCard({
     >
       <CardHeader className="gap-3">
         <div className="flex items-start gap-3">
-          <div className="grid size-11 shrink-0 place-items-center rounded-lg bg-binu-sky-soft text-binu-navy">
-            <CalendarCheck2 className="size-5" />
+          <div className="relative grid size-11 shrink-0 place-items-center overflow-hidden rounded-lg bg-binu-sky-soft text-binu-navy ring-1 ring-binu-line">
+            {iconSrc ? (
+              <Image src={iconSrc} alt="" fill sizes="44px" className="object-cover" />
+            ) : (
+              <CalendarCheck2 className="size-5" aria-hidden="true" />
+            )}
           </div>
           <div className="min-w-0">
             <CardTitle className="text-[17px] font-extrabold text-binu-ink">
@@ -70,10 +85,18 @@ export function RoutineCard({
             className="h-2 bg-binu-sky-soft [&_[data-slot=progress-indicator]]:bg-binu-sky"
           />
         </div>
-        <Button variant="binu" className="w-full justify-between" size="lg">
-          {actionLabel}
-          <ChevronRight className="size-4" />
-        </Button>
+        <div className={cn("grid gap-2", secondaryLabel && "grid-cols-2")}>
+          <Button variant="binu" className="w-full" size="lg" disabled={busy} onClick={onAction}>
+            {onAction ? <Check className="size-4" aria-hidden="true" /> : <ChevronRight className="size-4" aria-hidden="true" />}
+            {busy ? "기록 중" : actionLabel}
+          </Button>
+          {secondaryLabel ? (
+            <Button variant="binu-soft" className="w-full" size="lg" onClick={onSecondaryAction}>
+              <CircleHelp className="size-4" aria-hidden="true" />
+              {secondaryLabel}
+            </Button>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );

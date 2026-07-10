@@ -1,4 +1,4 @@
-import { ArrowUpRight, MapPin, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, Bookmark, BookmarkCheck, MapPin, ShieldCheck, Star } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,12 @@ type ServiceCardProps = {
   price: string;
   region: string;
   review: string;
+  rating?: string;
+  source?: string;
+  tags?: string[];
+  saved?: boolean;
+  onSave?: () => void;
+  onOpen?: () => void;
   className?: string;
 };
 
@@ -27,6 +33,12 @@ export function ServiceCard({
   price,
   region,
   review,
+  rating,
+  source,
+  tags = [],
+  saved = false,
+  onSave,
+  onOpen,
   className,
 }: ServiceCardProps) {
   return (
@@ -62,11 +74,39 @@ export function ServiceCard({
             {region}
           </span>
           <span>이용 후기: {review}</span>
+          {rating ? (
+            <span className="inline-flex items-center gap-1 text-binu-navy">
+              <Star className="size-3.5 fill-[#F2C35E] text-[#F2C35E]" aria-hidden="true" />
+              {rating}{source ? ` · ${source}` : ""}
+            </span>
+          ) : null}
         </div>
-        <Button variant="binu" className="w-full">
-          서비스 보기
-          <ArrowUpRight className="size-4" />
-        </Button>
+        {tags.length ? (
+          <div className="flex flex-wrap gap-1.5">
+            {tags.map((tag) => (
+              <span key={tag} className="rounded-full border border-binu-line bg-white px-2.5 py-1 text-xs font-semibold text-binu-muted">
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {onSave ? (
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant={saved ? "binu-soft" : "quiet"} className="w-full" onClick={onSave}>
+              {saved ? <BookmarkCheck className="size-4" aria-hidden="true" /> : <Bookmark className="size-4" aria-hidden="true" />}
+              {saved ? "저장됨" : "저장"}
+            </Button>
+            <Button variant="binu" className="w-full" onClick={onOpen}>
+              서비스 보기
+              <ArrowUpRight className="size-4" aria-hidden="true" />
+            </Button>
+          </div>
+        ) : (
+          <Button variant="binu" className="w-full" onClick={onOpen}>
+            서비스 보기
+            <ArrowUpRight className="size-4" aria-hidden="true" />
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
