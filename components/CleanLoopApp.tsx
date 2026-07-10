@@ -3,6 +3,42 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Bell,
+  Bookmark,
+  BookmarkCheck,
+  CalendarClock,
+  Check,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  History,
+  Home,
+  MessageSquareHeart,
+  MessagesSquare,
+  Minus,
+  PackageSearch,
+  PenLine,
+  Plus,
+  Send,
+  Settings2,
+  Sparkles,
+  Star,
+  ThumbsUp,
+  UserRound,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { BinuPickCard } from "@/components/binu/binu-pick-card";
+import { EmptyState as BinuEmptyState } from "@/components/binu/empty-state";
+import { RoutineCard } from "@/components/binu/routine-card";
+import { ServiceCard } from "@/components/binu/service-card";
+import { cn } from "@/lib/utils";
+import {
   completeCategoryById,
   createCategoryFromPreset,
   getCategoryPresets,
@@ -514,11 +550,18 @@ function errorMessageOf(error: unknown) {
 
 function IconTile({ icon, size = 48 }: { icon: string; size?: number }) {
   return (
-    <span className="category-icon" style={{ width: size, height: size }} aria-hidden="true">
-      <Image src={iconPath(icon)} alt="" width={size} height={size} />
+    <span className="relative grid shrink-0 place-items-center overflow-hidden rounded-lg border border-binu-line bg-binu-sky-soft" style={{ width: size, height: size }} aria-hidden="true">
+      <Image src={iconPath(icon)} alt="" fill sizes={`${size}px`} className="object-cover" />
     </span>
   );
 }
+
+const navigationItems = [
+  { key: "home", label: "홈", icon: Home },
+  { key: "selection", label: "비누 픽", icon: PackageSearch },
+  { key: "community", label: "커뮤니티", icon: MessagesSquare },
+  { key: "my", label: "마이", icon: UserRound },
+] as const;
 
 export function CleanLoopApp() {
   const [view, setView] = useState<View>("home");
@@ -714,7 +757,7 @@ export function CleanLoopApp() {
         : "직접 해본 방법과 주의할 점을 함께 남겨주세요.",
       body: (
         <form
-          className="compose-form"
+          className="grid gap-4"
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
@@ -754,37 +797,35 @@ export function CleanLoopApp() {
             showToast(isQa ? "질문을 저장했어요" : "팁을 저장했어요", "커뮤니티 목록에서 바로 확인할 수 있어요.");
           }}
         >
-          <label>
-            <span>카테고리</span>
-            <select name="category" defaultValue={communityCategoryFilter === "전체" ? "세탁/침구" : communityCategoryFilter}>
+          <label className="grid gap-2">
+            <span className="text-xs font-extrabold text-binu-navy">카테고리</span>
+            <select className="h-10 w-full rounded-lg border border-binu-mist bg-white px-3 text-sm text-binu-ink outline-none focus:border-binu-sky focus:ring-3 focus:ring-binu-sky/40" name="category" defaultValue={communityCategoryFilter === "전체" ? "세탁/침구" : communityCategoryFilter}>
               {categoryPresets.map((category) => (
                 <option key={category.id}>{category.name}</option>
               ))}
             </select>
           </label>
-          <label>
-            <span>{isQa ? "질문 제목" : "팁 제목"}</span>
-            <input name="title" placeholder={isQa ? "예: 수건 냄새가 계속 남아요" : "예: 욕실 물때를 줄이는 작은 루틴"} />
+          <label className="grid gap-2">
+            <span className="text-xs font-extrabold text-binu-navy">{isQa ? "질문 제목" : "팁 제목"}</span>
+            <Input className="h-10 bg-white" name="title" placeholder={isQa ? "예: 수건 냄새가 계속 남아요" : "예: 욕실 물때를 줄이는 작은 루틴"} />
           </label>
-          <label>
-            <span>{isQa ? "궁금한 내용" : "공유할 내용"}</span>
-            <textarea name="body" placeholder={isQa ? "상황, 사용한 제품, 재질을 함께 적으면 답변이 쉬워요." : "직접 해본 순서와 조심할 점을 적어주세요."} />
+          <label className="grid gap-2">
+            <span className="text-xs font-extrabold text-binu-navy">{isQa ? "궁금한 내용" : "공유할 내용"}</span>
+            <Textarea className="min-h-28 bg-white" name="body" placeholder={isQa ? "상황, 사용한 제품, 재질을 함께 적으면 답변이 쉬워요." : "직접 해본 순서와 조심할 점을 적어주세요."} />
           </label>
           {isQa ? (
-            <div className="community-note">
+            <div className="rounded-lg border border-[#F6DDC5] bg-binu-cream p-3 text-xs leading-6 text-binu-text">
               좋은 답변이 붙은 Q&A는 운영 검토 후 꿀팁 공유로 이동될 수 있습니다.
             </div>
           ) : (
-            <div className="community-note">
+            <div className="rounded-lg border border-[#F6DDC5] bg-binu-cream p-3 text-xs leading-6 text-binu-text">
               안전하지 않은 세제 혼합, 과장된 제품 추천은 운영 기준에 따라 조정될 수 있습니다.
             </div>
           )}
-          <button
-            className="primary-button"
-            type="submit"
-          >
+          <Button variant="binu" size="lg" type="submit">
             등록하기
-          </button>
+            <Send size={16} aria-hidden="true" />
+          </Button>
         </form>
       ),
     });
@@ -797,38 +838,42 @@ export function CleanLoopApp() {
       title: item.title,
       sub: `${item.category} · ${item.source}`,
       body: (
-        <div className="sheet-stack">
+        <div className="grid gap-4">
           {item.image ? (
-            <div className="detail-image">
-              <Image src={item.image} alt={item.title} fill sizes="390px" />
+            <div className="relative h-56 overflow-hidden rounded-lg border border-binu-line bg-white">
+              <Image src={item.image} alt={item.title} fill sizes="390px" className="object-contain" />
             </div>
           ) : (
-            <div className="preview-row">
+            <Card className="border-binu-line bg-white shadow-none">
+              <CardContent className="flex items-center gap-3">
               <IconTile icon={item.icon} />
               <div>
-                <strong>{item.source}</strong>
-                <span>{item.price}</span>
+                <strong className="block text-sm font-extrabold text-binu-ink">{item.source}</strong>
+                <span className="mt-1 block text-xs font-bold text-binu-muted">{item.price}</span>
               </div>
-            </div>
+              </CardContent>
+            </Card>
           )}
-          <div className="detail-summary">
-            <div><span>가격</span><strong>{item.price}</strong></div>
-            <div><span>후기</span><strong>★ {item.rating} · {item.reviews}</strong></div>
-            <div><span>{item.type === "product" ? "구매처" : "제공처"}</span><strong>{item.source}</strong></div>
+          <div className="grid grid-cols-3 gap-2">
+            <DetailMetric label="가격" value={item.price} />
+            <DetailMetric label="후기" value={`${item.rating} · ${item.reviews}`} icon={<Star className="size-3 fill-[#F2C35E] text-[#F2C35E]" aria-hidden="true" />} />
+            <DetailMetric label={item.type === "product" ? "구매처" : "제공처"} value={item.source} />
           </div>
           <InfoBlock title="맞는 상황">{item.fitFor}</InfoBlock>
-          <section className="info-block">
-            <h3>확인할 점</h3>
-            <ul>{item.checks.map((check) => <li key={check}>{check}</li>)}</ul>
-          </section>
+          <Card size="sm" className="border-binu-line bg-background shadow-none">
+            <CardHeader><CardTitle className="text-xs font-extrabold text-binu-navy">확인할 점</CardTitle></CardHeader>
+            <CardContent><ul className="list-disc space-y-1 pl-4 text-xs leading-6 text-binu-text">{item.checks.map((check) => <li key={check}>{check}</li>)}</ul></CardContent>
+          </Card>
           <InfoBlock title="구매 전 확인">가격, 옵션, 배송비, 예약 가능 여부는 외부 구매처에서 달라질 수 있습니다.</InfoBlock>
-          <div className="sheet-actions two">
-            <button type="button" className="ghost-button" onClick={() => toggleSave(item.id)}>
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" variant={saved ? "binu-soft" : "quiet"} onClick={() => toggleSave(item.id)}>
+              {saved ? <BookmarkCheck size={16} aria-hidden="true" /> : <Bookmark size={16} aria-hidden="true" />}
               {saved ? "담김" : "담기"}
-            </button>
-            <button type="button" className="secondary-button" onClick={() => showToast("외부 확인", item.source)}>
+            </Button>
+            <Button type="button" variant="binu" onClick={() => showToast("외부 확인", item.source)}>
               {item.type === "product" ? "구매처 보기" : "예약 정보"}
-            </button>
+              <ExternalLink size={16} aria-hidden="true" />
+            </Button>
           </div>
         </div>
       ),
@@ -852,18 +897,21 @@ export function CleanLoopApp() {
       title: "오늘 기준 항목",
       sub: "꼭 필요할 때만 조용히 알려드릴게요.",
       body: (
-        <div className="sheet-stack">
+        <div className="grid gap-3">
           {due.map((category) => (
-            <div className="list-row" key={category.id}>
+            <Card className="border-binu-line bg-white shadow-none" key={category.id}>
+              <CardContent className="grid grid-cols-[42px_1fr_auto] items-center gap-3">
               <IconTile icon={category.icon} size={42} />
-              <div>
-                <strong>{category.name}</strong>
-                <span>{statusDateLabel(categoryStatus(category).days)} · 다음 관리 {fmtDate(nextDate(category))}</span>
+              <div className="min-w-0">
+                <strong className="block text-xs font-extrabold text-binu-ink">{category.name}</strong>
+                <span className="mt-1 block truncate text-[10px] font-bold text-binu-muted">{statusDateLabel(categoryStatus(category).days)} · 다음 관리 {fmtDate(nextDate(category))}</span>
               </div>
-              <button className="small-button" type="button" onClick={() => completeCategory(category.id)}>
+              <Button variant="binu" size="sm" type="button" onClick={() => completeCategory(category.id)}>
+                <Check size={14} aria-hidden="true" />
                 했어요
-              </button>
-            </div>
+              </Button>
+              </CardContent>
+            </Card>
           ))}
         </div>
       ),
@@ -913,23 +961,30 @@ export function CleanLoopApp() {
   const activePostKind: CommunityTab = activePostId && communityPosts.qa.some((post) => post.id === activePostId) ? "qa" : "tips";
 
   return (
-    <div className="prototype-page">
-      <div className="app-shell" role="application" aria-label="비누 프로토타입">
-        <header className="app-header">
-          <div className="brand">
-            <div className="brand-mark" aria-hidden="true">✓</div>
+    <div className="flex min-h-dvh justify-center bg-[#DDEAF3] md:items-center md:py-5">
+      <div className="relative min-h-dvh w-full max-w-[430px] overflow-hidden bg-background shadow-[0_24px_90px_rgba(46,75,102,0.22)] md:h-[min(900px,calc(100dvh-2.5rem))] md:min-h-[700px] md:rounded-[26px] md:border md:border-white/80">
+        <header className="absolute inset-x-0 top-0 z-40 flex h-[74px] items-center justify-between border-b border-binu-line bg-background/90 px-5 backdrop-blur-xl">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Image
+              className="size-10 shrink-0 rounded-[10px] shadow-[0_7px_18px_rgba(46,75,102,0.13)]"
+              src="/binu/app-icon-soap-wordmark.svg"
+              alt=""
+              width={40}
+              height={40}
+              priority
+            />
             <div>
-              <div className="brand-title">비누</div>
-              <div className="brand-sub">비우는 루틴, 누리는 하루</div>
+              <div className="text-lg font-black leading-tight tracking-[-0.03em] text-binu-navy">비누</div>
+              <div className="mt-0.5 text-[10px] font-bold text-binu-muted">비우는 루틴, 누리는 하루</div>
             </div>
           </div>
-          <button className="icon-button" type="button" aria-label="알림" onClick={openNotification}>
-            {hasUnreadNotification ? <span className="alert-dot" /> : null}
-            <span aria-hidden="true">⌁</span>
-          </button>
+          <Button className="relative" variant="quiet" size="icon-lg" type="button" aria-label="알림" onClick={openNotification}>
+            {hasUnreadNotification ? <span className="absolute right-2 top-2 size-2 rounded-full border-2 border-white bg-[#D96A67]" /> : null}
+            <Bell size={21} aria-hidden="true" />
+          </Button>
         </header>
 
-        <main className="views">
+        <main className="absolute inset-x-0 bottom-[calc(72px+env(safe-area-inset-bottom,0px))] top-[74px] overflow-hidden">
           {view === "home" ? (
             <HomeView
               categories={sortedCategories}
@@ -1012,7 +1067,7 @@ export function CleanLoopApp() {
                   title: "저장한 셀렉션",
                   sub: `${saved.length}개 담김`,
                   body: saved.length ? (
-                    <div className="sheet-stack">{saved.map((item) => <SelectionCard key={item.id} item={item} saved onToggleSave={toggleSave} onDetail={openSelectionDetail} />)}</div>
+                    <div className="grid gap-4">{saved.map((item) => <SelectionCard key={item.id} item={item} saved onToggleSave={toggleSave} onDetail={openSelectionDetail} />)}</div>
                   ) : (
                     <EmptyState title="담은 셀렉션이 없습니다" desc="상품이나 서비스를 담으면 여기에서 다시 볼 수 있습니다." />
                   ),
@@ -1058,29 +1113,30 @@ export function CleanLoopApp() {
           ) : null}
         </main>
 
-        <nav className="tabbar" aria-label="하단 네비게이션">
-          {[
-            ["home", "홈", "⌂"],
-            ["selection", "셀렉션", "□"],
-            ["community", "커뮤니티", "≡"],
-            ["my", "마이", "○"],
-          ].map(([key, label, icon]) => (
-            <button
-              key={key}
-              className={`tab-button ${view === key || (view === "community-detail" && key === "community") ? "active" : ""}`}
-              type="button"
-              aria-current={view === key ? "page" : undefined}
-              onClick={() => setView(key as View)}
-            >
-              <span className="tab-icon" aria-hidden="true">{icon}</span>
-              <span>{label}</span>
-            </button>
-          ))}
+        <nav className="absolute inset-x-0 bottom-0 z-50 grid h-[calc(72px+env(safe-area-inset-bottom,0px))] grid-cols-4 border-t border-binu-line bg-white/95 px-2 pb-[env(safe-area-inset-bottom,0px)] pt-1.5 backdrop-blur-xl" aria-label="하단 네비게이션">
+          {navigationItems.map(({ key, label, icon: Icon }) => {
+            const isActive = view === key || (view === "community-detail" && key === "community");
+            return (
+              <button
+                key={key}
+                className={cn(
+                  "relative grid place-items-center content-center gap-1 rounded-lg text-[10px] font-bold text-binu-muted transition hover:bg-binu-sky-soft/60 hover:text-binu-navy focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-binu-sky/50",
+                  isActive && "font-black text-binu-navy before:absolute before:top-0 before:h-[3px] before:w-6 before:rounded-full before:bg-binu-sky",
+                )}
+                type="button"
+                aria-current={isActive ? "page" : undefined}
+                onClick={() => setView(key)}
+              >
+                <span className="grid place-items-center" aria-hidden="true"><Icon size={21} /></span>
+                <span>{label}</span>
+              </button>
+            );
+          })}
         </nav>
 
         {sheet ? (
           <div
-            className="sheet-backdrop"
+            className="absolute inset-0 z-80 flex items-end bg-binu-ink/35 backdrop-blur-[4px] animate-in fade-in duration-200 md:rounded-[26px]"
             role="dialog"
             aria-modal="true"
             aria-labelledby="sheetTitle"
@@ -1089,28 +1145,30 @@ export function CleanLoopApp() {
               setCycleManagerEditing(false);
             }}
           >
-            <section className="sheet-panel" onClick={(event) => event.stopPropagation()}>
-              <header className="sheet-header">
+            <section className="max-h-[86%] w-full overflow-hidden rounded-t-[18px] border border-b-white/80 bg-background shadow-[0_-20px_70px_rgba(23,32,42,0.18)] animate-in slide-in-from-bottom-4 duration-300" onClick={(event) => event.stopPropagation()}>
+              <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-binu-mist" />
+              <header className="flex items-start justify-between gap-3 border-b border-binu-line bg-white/90 px-5 pb-3 pt-2">
                 <div>
-                  <p className="eyebrow">{sheet.step}</p>
-                  <h2 id="sheetTitle">{sheet.title}</h2>
-                  {sheet.sub ? <p>{sheet.sub}</p> : null}
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-binu-muted">{sheet.step}</p>
+                  <h2 className="mt-1 text-xl font-black tracking-[-0.03em] text-binu-ink" id="sheetTitle">{sheet.title}</h2>
+                  {sheet.sub ? <p className="mt-1 max-w-[250px] text-[10px] font-medium leading-5 text-binu-muted">{sheet.sub}</p> : null}
                 </div>
-                <div className="sheet-header-actions">
+                <div className="flex shrink-0 items-center gap-1.5">
                   {sheet.kind === "cycleManager" ? (
                     cycleManagerEditing ? (
                       <>
-                        <button className="sheet-text-action" type="button" onClick={cancelCycleEditing}>취소</button>
-                        <button className="sheet-save-action" type="button" disabled={cycleSaving} onClick={saveCycleEditing}>
+                        <Button variant="ghost" size="sm" type="button" onClick={cancelCycleEditing}>취소</Button>
+                        <Button variant="binu" size="sm" type="button" disabled={cycleSaving} onClick={saveCycleEditing}>
                           {cycleSaving ? "저장 중" : "저장"}
-                        </button>
+                        </Button>
                       </>
                     ) : (
-                      <button className="sheet-save-action" type="button" onClick={startCycleEditing}>주기 수정하기</button>
+                      <Button variant="binu" size="sm" type="button" onClick={startCycleEditing}>주기 수정하기</Button>
                     )
                   ) : null}
-                  <button
-                    className="icon-button"
+                  <Button
+                    variant="quiet"
+                    size="icon-lg"
                     type="button"
                     aria-label="닫기"
                     onClick={() => {
@@ -1118,11 +1176,11 @@ export function CleanLoopApp() {
                       setCycleManagerEditing(false);
                     }}
                   >
-                    ×
-                  </button>
+                    <X size={20} aria-hidden="true" />
+                  </Button>
                 </div>
               </header>
-              <div className="sheet-body">
+              <div className="max-h-[calc(86dvh-92px)] overflow-y-auto px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] pt-4">
                 {sheet.kind === "cycleManager" ? (
                   <CycleManager
                     categories={categories}
@@ -1142,11 +1200,11 @@ export function CleanLoopApp() {
         ) : null}
 
         {toast ? (
-          <div className="toast" role="status" aria-live="polite">
-            <span aria-hidden="true">✓</span>
+          <div className="absolute bottom-[calc(82px+env(safe-area-inset-bottom,0px))] left-1/2 z-100 grid w-[calc(100%-2.5rem)] max-w-[360px] -translate-x-1/2 grid-cols-[auto_1fr] items-center gap-3 rounded-lg border border-white/20 bg-binu-navy/95 px-4 py-3 text-white shadow-[0_18px_50px_rgba(23,32,42,0.22)] backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2" role="status" aria-live="polite">
+            <CheckCircle2 size={20} aria-hidden="true" />
             <div>
-              <strong>{toast.title}</strong>
-              {toast.desc ? <small>{toast.desc}</small> : null}
+              <strong className="block text-xs font-extrabold">{toast.title}</strong>
+              {toast.desc ? <small className="mt-1 block text-[10px] text-white/70">{toast.desc}</small> : null}
             </div>
           </div>
         ) : null}
@@ -1193,29 +1251,40 @@ function HomeView({
     .sort((a, b) => Number(Boolean(b.authored)) - Number(Boolean(a.authored)) || b.helpful + b.saved - (a.helpful + a.saved))
     .slice(0, 2);
   return (
-    <section className="view">
-      <div className="home-dashboard">
-        <div>
-          <p className="eyebrow">2026년 7월 10일 금요일</p>
-          <h1>보송님, 오늘은 여기만 봐도 충분해요</h1>
-          <p>{syncState === "loading" || syncState === "error" ? syncMessage : "다 한 일은 했어요만 눌러주세요. 다음 주기는 제가 기억할게요."}</p>
-        </div>
-        <div className="today-chip"><strong>10</strong><span>금</span></div>
-      </div>
+    <section className="view h-full overflow-y-auto px-5 pb-8 pt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <Card className="relative overflow-hidden border-binu-line bg-[linear-gradient(145deg,#E7F1FB_0%,#FFFFFF_58%,#FFF7F0_100%)] shadow-[0_18px_50px_rgba(46,75,102,0.08)]">
+        <div className="pointer-events-none absolute -bottom-16 -right-10 size-36 rounded-full border-[24px] border-binu-sky/20" />
+        <CardContent className="relative grid grid-cols-[1fr_auto] gap-4 py-2">
+          <div>
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-binu-muted">2026년 7월 10일 금요일</p>
+            <h1 className="mt-3 text-[27px] font-black leading-[1.25] tracking-[-0.04em] text-binu-ink">보송님, 오늘은<br />여기만 봐도 충분해요</h1>
+            <p className="mt-3 text-[13px] font-medium leading-6 text-binu-text">{syncState === "loading" || syncState === "error" ? syncMessage : "다 한 일은 했어요만 눌러주세요. 다음 주기는 제가 기억할게요."}</p>
+          </div>
+          <div className="grid size-14 place-items-center self-start rounded-lg border border-white bg-white/80 text-binu-navy shadow-sm">
+            <div className="text-center"><strong className="block text-xl font-black leading-none">10</strong><span className="mt-1 block text-[10px] font-extrabold">금</span></div>
+          </div>
+        </CardContent>
+      </Card>
 
-      <div className="home-info-grid">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <InfoTile value={categories.length} label="관리 중인 주기" />
         <InfoTile value={weeklyDone} label="최근 7일 완료" />
         <InfoTile value={nearest ? statusDateLabel(categoryStatus(nearest).days) : "-"} label={nearest ? `${nearest.name} 다음 관리` : "주기 관리에서 켜기"} />
         <InfoTile value={dueCount} label="오늘 기준 항목" />
       </div>
 
-      <section className="section">
-        <div className="section-head">
-          <h2>청소 주기</h2>
-          <button className="text-button" type="button" onClick={onManageCycle}>주기 관리</button>
+      <section className="mt-9">
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <div>
+            <span className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-binu-muted">Routine</span>
+            <h2 className="mt-1 text-xl font-black tracking-[-0.03em] text-binu-ink">오늘의 홈케어</h2>
+          </div>
+          <Button variant="quiet" size="sm" type="button" onClick={onManageCycle}>
+            <Settings2 size={15} aria-hidden="true" />
+            주기 관리
+          </Button>
         </div>
-        <div className="stack">
+        <div className="grid gap-4">
           {categories.length ? categories.map((category) => (
             <CategoryCard
               key={category.id}
@@ -1228,53 +1297,57 @@ function HomeView({
         </div>
       </section>
 
-      <section className="section compact">
-        <div className="section-head">
-          <h2>최근 완료</h2>
-          <span className="muted">최신순</span>
+      <section className="mt-9">
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <h2 className="text-xl font-black tracking-[-0.03em] text-binu-ink">최근 완료</h2>
+          <span className="text-xs font-bold text-binu-muted">최신순</span>
         </div>
-        <div className="history-strip">
+        <div className="-mx-5 flex snap-x gap-2 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {logs.slice(0, 5).map((log) => (
-            <article className="mini-log" key={log.id}>
+            <Card className="min-w-28 snap-start border-binu-line bg-white shadow-none" key={log.id}>
+              <CardContent>
               <IconTile icon={log.icon} size={34} />
-              <strong>{log.categoryName}</strong>
-              <span>{fmtDate(log.date)}</span>
-            </article>
+              <strong className="mt-3 block text-xs font-extrabold text-binu-ink">{log.categoryName}</strong>
+              <span className="mt-1 block text-[10px] font-bold text-binu-muted">{fmtDate(log.date)}</span>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </section>
 
-      <section className="section compact">
-        <div className="section-head">
-          <h2>인기 셀렉션</h2>
-          <span className="muted">많이 본 추천</span>
+      <section className="mt-9">
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <h2 className="text-xl font-black tracking-[-0.03em] text-binu-ink">인기 비누 픽</h2>
+          <span className="text-xs font-bold text-binu-muted">많이 본 추천</span>
         </div>
-        <div className="home-promo-list">
+        <div className="grid gap-2">
           {popularSelections.map((item) => (
-            <button className="home-promo-card" key={item.id} type="button" onClick={() => onOpenSelection(item.category)}>
+            <button className="grid w-full grid-cols-[34px_1fr_auto] items-center gap-3 rounded-lg border border-binu-line bg-white p-3 text-left transition hover:border-binu-sky hover:bg-binu-sky-soft/40" key={item.id} type="button" onClick={() => onOpenSelection(item.category)}>
               <IconTile icon={item.icon} size={34} />
-              <div>
-                <strong>{item.title}</strong>
-                <span>{item.category} · {item.price}</span>
+              <div className="min-w-0">
+                <strong className="block truncate text-xs font-extrabold text-binu-ink">{item.title}</strong>
+                <span className="mt-1 block truncate text-[10px] font-bold text-binu-muted">{item.category} · {item.price}</span>
               </div>
+              <ChevronRight className="size-4 text-binu-navy" aria-hidden="true" />
             </button>
           ))}
         </div>
       </section>
 
-      <section className="section compact">
-        <div className="section-head">
-          <h2>인기 커뮤니티</h2>
-          <span className="muted">도움 받은 글</span>
+      <section className="mt-9">
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <h2 className="text-xl font-black tracking-[-0.03em] text-binu-ink">인기 커뮤니티</h2>
+          <span className="text-xs font-bold text-binu-muted">도움 받은 글</span>
         </div>
-        <div className="home-promo-list">
+        <div className="grid gap-2">
           {popularPosts.map((post) => (
-            <button className="home-promo-card" key={post.id} type="button" onClick={() => onOpenCommunity(post)}>
+            <button className="grid w-full grid-cols-[34px_1fr_auto] items-center gap-3 rounded-lg border border-binu-line bg-white p-3 text-left transition hover:border-binu-sky hover:bg-binu-sky-soft/40" key={post.id} type="button" onClick={() => onOpenCommunity(post)}>
               <IconTile icon={post.icon} size={34} />
-              <div>
-                <strong>{post.title}</strong>
-                <span>{post.authored ? "내 글" : post.category} · 도움 {post.helpful}</span>
+              <div className="min-w-0">
+                <strong className="block truncate text-xs font-extrabold text-binu-ink">{post.title}</strong>
+                <span className="mt-1 block truncate text-[10px] font-bold text-binu-muted">{post.authored ? "내 글" : post.category} · 도움 {post.helpful}</span>
               </div>
+              <ChevronRight className="size-4 text-binu-navy" aria-hidden="true" />
             </button>
           ))}
         </div>
@@ -1295,25 +1368,26 @@ function CategoryCard({
   onHelp: (categoryName: string) => void;
 }) {
   const status = categoryStatus(category);
+  const statusTone = status.key === "doneToday" ? "done" : status.key === "good" ? "good" : status.key === "soon" ? "soon" : "due";
+  const progress = status.key === "doneToday"
+    ? 8
+    : Math.min(100, Math.max(12, ((category.cycleDays - status.days) / category.cycleDays) * 100));
   return (
-    <article className={`task-card status-${status.key}`}>
-      <div className="task-head">
-        <IconTile icon={category.icon} />
-        <div className="task-main">
-          <span className="status-label">{status.label}</span>
-          <h3>{category.name}</h3>
-          <p>마지막 완료 {fmtDate(category.lastDoneAt)} · {category.cycleDays}일 주기 · 다음 관리 {fmtDate(nextDate(category))}</p>
-        </div>
-        <span className="status-pill">{statusDateLabel(status.days)}</span>
-      </div>
-      <p className="task-note">{category.note}</p>
-      <div className="task-actions">
-        <button className="primary-button" type="button" disabled={busy} onClick={() => onComplete(category.id)}>
-          {busy ? "기록 중" : "했어요"}
-        </button>
-        <button className="secondary-button" type="button" onClick={() => onHelp(category.category)}>도움 볼래요</button>
-      </div>
-    </article>
+    <RoutineCard
+      className="shadow-[0_18px_50px_rgba(46,75,102,0.08)]"
+      title={category.name}
+      description={category.note}
+      schedule={`마지막 ${fmtDate(category.lastDoneAt)} · ${category.cycleDays}일 주기 · 다음 ${fmtDate(nextDate(category))}`}
+      progress={progress}
+      status={statusTone}
+      statusLabel={`${status.label} · ${statusDateLabel(status.days)}`}
+      actionLabel="했어요"
+      secondaryLabel="도움 보기"
+      iconSrc={iconPath(category.icon)}
+      busy={busy}
+      onAction={() => onComplete(category.id)}
+      onSecondaryAction={() => onHelp(category.category)}
+    />
   );
 }
 
@@ -1333,20 +1407,23 @@ function SelectionView({
   const filters = ["전체", ...categoryPresets.map((category) => category.name)];
   const items = filter === "전체" ? selectionItems : selectionItems.filter((item) => item.category === filter);
   return (
-    <section className="view">
-      <div className="selection-hero">
-        <span>이번 주 추천</span>
-        <h1>가격과 후기를 먼저 보고 골라요</h1>
-        <p>상품과 서비스는 하나의 카드가 하나의 선택지가 되도록 정리했습니다.</p>
-      </div>
-      <div className="filter-row">
+    <section className="view h-full overflow-y-auto px-5 pb-8 pt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <Card className="relative overflow-hidden border-binu-line bg-[linear-gradient(145deg,#FFF7F0_0%,#FFFFFF_72%)] shadow-[0_18px_50px_rgba(46,75,102,0.08)]">
+        <CardContent>
+          <div className="grid size-11 place-items-center rounded-lg border border-binu-line bg-white text-binu-navy shadow-sm" aria-hidden="true"><Sparkles className="size-5" /></div>
+          <p className="mt-5 text-[11px] font-extrabold uppercase tracking-[0.12em] text-binu-muted">Binu Pick · 상황별로 고른 선택지</p>
+          <h1 className="mt-3 text-[29px] font-black leading-[1.2] tracking-[-0.04em] text-binu-ink">검색은 비우고,<br />선택은 가볍게.</h1>
+          <p className="mt-3 text-sm font-medium leading-7 text-binu-text">용도와 주의점, 가격과 후기를 한눈에 비교해 지금 필요한 선택지를 빠르게 좁혀보세요.</p>
+        </CardContent>
+      </Card>
+      <div className="-mx-5 mt-4 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {filters.map((item) => (
-          <button className={`filter-chip ${filter === item ? "active" : ""}`} key={item} type="button" onClick={() => onFilter(item)}>
+          <Button className="shrink-0 rounded-full" variant={filter === item ? "binu" : "quiet"} size="sm" key={item} type="button" onClick={() => onFilter(item)}>
             {item}
-          </button>
+          </Button>
         ))}
       </div>
-      <div className="stack">
+      <div className="mt-4 grid gap-4">
         {items.length ? items
           .slice()
           .sort((a, b) => Number(Boolean(b.highlight)) - Number(Boolean(a.highlight)))
@@ -1375,29 +1452,40 @@ function SelectionCard({
   onToggleSave: (id: string) => void;
   onDetail: (item: SelectionItem) => void;
 }) {
+  if (item.type === "service") {
+    return (
+      <ServiceCard
+        title={item.title}
+        description={item.summary}
+        price={item.price}
+        region={item.fitFor}
+        review={`후기 ${item.reviews}개`}
+        rating={item.rating}
+        source={item.source}
+        tags={item.tags}
+        saved={saved}
+        onSave={() => onToggleSave(item.id)}
+        onOpen={() => onDetail(item)}
+      />
+    );
+  }
+
   return (
-    <article className={`selection-card ${item.highlight ? "featured" : ""}`}>
-      {item.image ? (
-        <div className="product-image">
-          <Image src={item.image} alt={item.title} width={96} height={112} sizes="96px" />
-        </div>
-      ) : (
-        <div className="product-image placeholder"><IconTile icon={item.icon} /></div>
-      )}
-      <div className="selection-info">
-        <span>{item.category} · {item.type === "product" ? "상품" : "서비스"}</span>
-        <h3>{item.title}</h3>
-        <div className="selection-price">{item.price}</div>
-        <div className="selection-rating">★ {item.rating} · 후기 {item.reviews}</div>
-        <p>{item.summary}</p>
-        <div className="store-line"><span>{item.type === "product" ? "구매처" : "제공처"}</span><strong>{item.source}</strong></div>
-        <div className="tag-row">{item.tags.map((tag) => <span className="tag" key={tag}>{tag}</span>)}</div>
-        <div className="card-actions">
-          <button className="ghost-button" type="button" onClick={() => onToggleSave(item.id)}>{saved ? "담김" : "담기"}</button>
-          <button className="secondary-button" type="button" onClick={() => onDetail(item)}>{item.type === "product" ? "구매처 보기" : "예약 정보"}</button>
-        </div>
-      </div>
-    </article>
+    <BinuPickCard
+      className={cn(item.highlight && "border-binu-sky")}
+      title={item.title}
+      description={item.summary}
+      price={item.price}
+      rating={`${item.rating} · 후기 ${item.reviews}`}
+      source={`${item.category} · ${item.source}`}
+      imageSrc={item.image}
+      tags={item.tags}
+      saved={saved}
+      saveLabel="비누 노트"
+      openLabel="자세히 보기"
+      onSave={() => onToggleSave(item.id)}
+      onOpen={() => onDetail(item)}
+    />
   );
 }
 
@@ -1424,42 +1512,48 @@ function CommunityView({
     .slice()
     .sort((a, b) => Number(Boolean(b.authored)) - Number(Boolean(a.authored)) || b.helpful + b.saved - (a.helpful + a.saved));
   return (
-    <section className="view">
-      <div className="page-title">
-        <p className="eyebrow">커뮤니티</p>
-        <h1>막히는 청소 문제는 함께 해결해요</h1>
-        <p>직접 글을 남기고, 검토된 Q&A는 꿀팁으로 다시 정리됩니다.</p>
+    <section className="view h-full overflow-y-auto px-5 pb-8 pt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <Card className="border-binu-line bg-[linear-gradient(145deg,#FFFFFF_40%,#E7F1FB_100%)] shadow-[0_18px_50px_rgba(46,75,102,0.08)]">
+        <CardContent>
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-binu-muted">Community</p>
+          <h1 className="mt-3 text-[27px] font-black leading-[1.25] tracking-[-0.04em] text-binu-ink">막히는 청소 문제는<br />함께 해결해요</h1>
+          <p className="mt-3 text-sm font-medium leading-7 text-binu-text">직접 글을 남기고, 검토된 Q&amp;A는 꿀팁으로 다시 정리됩니다.</p>
+        </CardContent>
+      </Card>
+      <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg border border-binu-line bg-white p-1" role="tablist" aria-label="커뮤니티 분류">
+        <Button className="w-full" variant={tab === "tips" ? "binu-soft" : "ghost"} role="tab" aria-selected={tab === "tips"} type="button" onClick={() => onTab("tips")}>꿀팁 공유</Button>
+        <Button className="w-full" variant={tab === "qa" ? "binu-soft" : "ghost"} role="tab" aria-selected={tab === "qa"} type="button" onClick={() => onTab("qa")}>Q&amp;A</Button>
       </div>
-      <div className="segmented" role="tablist" aria-label="커뮤니티 분류">
-        <button className={`segment ${tab === "tips" ? "active" : ""}`} type="button" onClick={() => onTab("tips")}>꿀팁 공유</button>
-        <button className={`segment ${tab === "qa" ? "active" : ""}`} type="button" onClick={() => onTab("qa")}>Q&amp;A</button>
-      </div>
-      <div className="community-action-row">
-        <p>{tab === "qa" ? "좋은 답변이 붙은 Q&A는 관리자가 꿀팁 공유로 옮겨요." : "경험 기반 팁을 카테고리별로 공유할 수 있어요."}</p>
-        <button className="community-write-button" type="button" onClick={() => onWrite(tab)}>
+      <Card className="mt-3 border-[#F6DDC5] bg-binu-cream shadow-none">
+        <CardContent className="flex items-center justify-between gap-3">
+          <p className="text-xs font-medium leading-5 text-binu-text">{tab === "qa" ? "좋은 답변이 붙은 Q&A는 관리자가 꿀팁 공유로 옮겨요." : "경험 기반 팁을 카테고리별로 공유할 수 있어요."}</p>
+          <Button className="shrink-0" variant="binu" size="sm" type="button" onClick={() => onWrite(tab)}>
+          <PenLine size={16} aria-hidden="true" />
           {tab === "qa" ? "질문하기" : "팁 쓰기"}
-        </button>
-      </div>
-      <div className="filter-row">
+          </Button>
+        </CardContent>
+      </Card>
+      <div className="-mx-5 mt-4 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {filters.map((item) => (
-          <button className={`filter-chip ${categoryFilter === item ? "active" : ""}`} key={item} type="button" onClick={() => onCategoryFilter(item)}>
+          <Button className="shrink-0 rounded-full" variant={categoryFilter === item ? "binu" : "quiet"} size="sm" key={item} type="button" onClick={() => onCategoryFilter(item)}>
             {item}
-          </button>
+          </Button>
         ))}
       </div>
-      <div className="stack">
+      <div className="mt-4 grid gap-3">
         {visiblePosts.length ? visiblePosts.map((post) => (
-          <article className="community-card" key={post.id} onClick={() => onOpen(post.id)}>
-            <div className="community-top">
+          <button className="w-full rounded-lg border border-binu-line bg-white p-4 text-left shadow-[0_14px_38px_rgba(46,75,102,0.06)] transition hover:border-binu-sky hover:shadow-[0_18px_42px_rgba(46,75,102,0.10)]" key={post.id} type="button" onClick={() => onOpen(post.id)}>
+            <div className="grid grid-cols-[48px_1fr] gap-3">
               <IconTile icon={post.icon} />
-              <div>
-                <span className="pill">{post.authored ? "내 글" : tab === "qa" ? "Q&A" : "꿀팁"}</span>
-                <h3>{post.title}</h3>
-                <p className="meta">{post.category} · #{post.tag} · {post.level} · {post.time} · 도움 {post.helpful}</p>
+              <div className="min-w-0">
+                <span className="inline-flex rounded-full border border-binu-line bg-binu-sky-soft px-2 py-1 text-[10px] font-extrabold text-binu-navy">{post.authored ? "내 글" : tab === "qa" ? "Q&A" : "꿀팁"}</span>
+                <h3 className="mt-2 text-[15px] font-extrabold leading-6 text-binu-ink">{post.title}</h3>
+                <p className="mt-1 text-[10px] font-bold leading-5 text-binu-muted">{post.category} · #{post.tag} · {post.level} · {post.time} · 도움 {post.helpful}</p>
               </div>
             </div>
-            <p>{post.body}</p>
-          </article>
+            <p className="mt-4 text-xs font-medium leading-6 text-binu-text">{post.body}</p>
+            <span className="mt-4 inline-flex items-center gap-1 text-xs font-extrabold text-binu-navy">읽어보기 <ChevronRight size={15} aria-hidden="true" /></span>
+          </button>
         )) : <EmptyState title="아직 연결된 글이 없습니다" desc="카테고리별 팁은 검수된 내용부터 채워둘게요." />}
       </div>
     </section>
@@ -1485,35 +1579,42 @@ function CommunityDetail({
 }) {
   const relatedSelections = selectionItems.filter((item) => post.relatedSelectionIds.includes(item.id));
   return (
-    <section className="view">
-      <button className="back-button" type="button" onClick={onBack}>‹ 커뮤니티</button>
-      <article className="community-detail">
-        <header className="detail-head">
+    <section className="view h-full overflow-y-auto px-5 pb-8 pt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <Button variant="ghost" size="sm" type="button" onClick={onBack}><ChevronLeft size={18} aria-hidden="true" />커뮤니티</Button>
+      <Card className="mt-2 border-binu-line bg-white shadow-[0_18px_50px_rgba(46,75,102,0.08)]">
+        <CardHeader>
+          <div className="grid grid-cols-[48px_1fr] gap-3">
           <IconTile icon={post.icon} />
-          <div>
-            <p className="eyebrow">커뮤니티 · {post.category}</p>
-            <h1>{post.title}</h1>
-            <p className="meta">{post.level} · {post.time} · 도움 {post.helpful} · 저장 {post.saved} · {kind === "qa" ? "답글" : "댓글"} {post.comments}</p>
+          <div className="min-w-0">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-binu-muted">커뮤니티 · {post.category}</p>
+            <h1 className="mt-2 text-xl font-black leading-7 tracking-[-0.03em] text-binu-ink">{post.title}</h1>
+            <p className="mt-2 text-[10px] font-bold leading-5 text-binu-muted">{post.level} · {post.time} · 도움 {post.helpful} · 저장 {post.saved} · {kind === "qa" ? "답글" : "댓글"} {post.comments}</p>
           </div>
-        </header>
-        <div className="community-reaction-row">
-          <button className={post.helpedByMe ? "active" : ""} type="button" onClick={onHelpful}>
+          </div>
+        </CardHeader>
+        <CardContent>
+        <Separator className="mb-4 bg-binu-line" />
+        <div className="flex gap-2">
+          <Button variant={post.helpedByMe ? "binu-soft" : "quiet"} size="sm" type="button" onClick={onHelpful}>
+            <ThumbsUp size={16} aria-hidden="true" />
             도움 {post.helpful}
-          </button>
-          <button className={post.savedByMe ? "active" : ""} type="button" onClick={onSave}>
+          </Button>
+          <Button variant={post.savedByMe ? "binu-soft" : "quiet"} size="sm" type="button" onClick={onSave}>
+            {post.savedByMe ? <BookmarkCheck size={16} aria-hidden="true" /> : <Bookmark size={16} aria-hidden="true" />}
             {post.savedByMe ? "저장됨" : "저장"} {post.saved}
-          </button>
+          </Button>
         </div>
         <InfoBlock title="요약">{post.body}</InfoBlock>
-        <section className="info-block">
-          <h3>진행 순서</h3>
-          <ol>{post.steps.map((step) => <li key={step}>{step}</li>)}</ol>
-        </section>
+        <Card size="sm" className="mt-3 border-binu-line bg-background shadow-none">
+          <CardHeader><CardTitle className="text-xs font-extrabold text-binu-navy">진행 순서</CardTitle></CardHeader>
+          <CardContent><ol className="list-decimal space-y-1 pl-4 text-xs leading-6 text-binu-text">{post.steps.map((step) => <li key={step}>{step}</li>)}</ol></CardContent>
+        </Card>
         <InfoBlock title="확인 필요">{post.safety} 관련 내용은 재질과 제품 표기를 먼저 확인하세요.</InfoBlock>
-        <section className="info-block">
-          <h3>{kind === "qa" ? "답글과 답변" : "댓글"}</h3>
+        <Card size="sm" className="mt-3 border-binu-line bg-background shadow-none">
+          <CardHeader><CardTitle className="text-xs font-extrabold text-binu-navy">{kind === "qa" ? "답글과 답변" : "댓글"}</CardTitle></CardHeader>
+          <CardContent>
           <form
-            className="reply-form"
+            className="grid grid-cols-[1fr_auto] gap-2"
             onSubmit={(event) => {
               event.preventDefault();
               const form = new FormData(event.currentTarget);
@@ -1521,28 +1622,36 @@ function CommunityDetail({
               event.currentTarget.reset();
             }}
           >
-            <input name="reply" placeholder={kind === "qa" ? "답글을 남겨주세요" : "댓글을 남겨주세요"} />
-            <button type="submit">{kind === "qa" ? "답글" : "댓글"}</button>
+            <Input className="h-9 bg-white" name="reply" placeholder={kind === "qa" ? "답글을 남겨주세요" : "댓글을 남겨주세요"} />
+            <Button variant="binu" type="submit" aria-label={kind === "qa" ? "답글 등록" : "댓글 등록"}>
+              <Send size={16} aria-hidden="true" />
+              {kind === "qa" ? "답글" : "댓글"}
+            </Button>
           </form>
-          <div className="answer-list">{post.answers.map((answer) => <p key={answer}>{answer}</p>)}</div>
-        </section>
-        <section className="info-block">
-          <h3>관련 셀렉션</h3>
+          <div className="mt-3 grid gap-2">{post.answers.map((answer) => <p className="rounded-lg border border-binu-line bg-white px-3 py-2 text-xs leading-6 text-binu-text" key={answer}>{answer}</p>)}</div>
+          </CardContent>
+        </Card>
+        <Card size="sm" className="mt-3 border-binu-line bg-background shadow-none">
+          <CardHeader><CardTitle className="text-xs font-extrabold text-binu-navy">관련 비누 픽</CardTitle></CardHeader>
+          <CardContent>
           {relatedSelections.length ? (
-            <div className="related-selection-list">
+            <div className="grid gap-2">
               {relatedSelections.map((item) => (
-                <button className="related-selection-row" key={item.id} type="button" onClick={onOpenSelection}>
+                <button className="grid w-full grid-cols-[34px_1fr_auto_auto] items-center gap-2 rounded-lg border border-binu-line bg-white p-2 text-left" key={item.id} type="button" onClick={onOpenSelection}>
                   <IconTile icon={item.icon} size={34} />
-                  <span>{item.title}</span>
-                  <strong>{item.price}</strong>
+                  <span className="truncate text-[11px] font-bold text-binu-ink">{item.title}</span>
+                  <strong className="text-[10px] font-extrabold text-binu-navy">{item.price}</strong>
+                  <ChevronRight className="size-4 text-binu-muted" aria-hidden="true" />
                 </button>
               ))}
             </div>
           ) : (
-            <p>아직 연결된 상품이나 서비스가 없습니다.</p>
+            <p className="text-xs leading-6 text-binu-text">아직 연결된 상품이나 서비스가 없습니다.</p>
           )}
-        </section>
-      </article>
+          </CardContent>
+        </Card>
+        </CardContent>
+      </Card>
     </section>
   );
 }
@@ -1572,51 +1681,89 @@ function MyView({
 }) {
   const levels = [1, 0, 2, 1, 0, 1, 2, 1, 3, 2, 2, Math.min(3, Math.max(1, logs.length - 3))];
   return (
-    <section className="view">
-      <div className="profile-band">
-        <div className="avatar">보</div>
-        <div>
-          <p className="eyebrow">김보송님의 기록</p>
-          <h1>청소발자국</h1>
-          <p>내 청소 리듬을 짧게 보고, 자세한 기록은 메뉴에서 확인해요.</p>
-        </div>
-      </div>
-      <div className="stats-grid">
+    <section className="view h-full overflow-y-auto px-5 pb-8 pt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <Card className="border-binu-line bg-[linear-gradient(145deg,#E7F1FB_0%,#FFFFFF_72%)] shadow-[0_18px_50px_rgba(46,75,102,0.08)]">
+        <CardContent className="grid grid-cols-[60px_1fr] items-center gap-4">
+          <div className="grid size-15 place-items-center rounded-full border-4 border-white bg-binu-sky text-lg font-black text-binu-navy shadow-sm">보</div>
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-binu-muted">My Binu</p>
+            <h1 className="mt-2 text-xl font-black tracking-[-0.03em] text-binu-ink">보송님의 비누 기록</h1>
+            <p className="mt-2 text-xs font-medium leading-6 text-binu-text">완벽하지 않아도 괜찮아요. 다시 시작한 작은 기록까지 모아둘게요.</p>
+          </div>
+        </CardContent>
+      </Card>
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <InfoTile value={logs.length} label="이번 달 완료" />
         <InfoTile value={categories.length} label="사용 중인 주기" />
         <InfoTile value={savedCount} label="담은 셀렉션" />
         <InfoTile value={savedCommunityPosts.length} label="저장한 글" />
       </div>
-      <section className="section">
-        <div className="section-head">
-          <h2>최근 12주</h2>
-          <span className="muted">주간 완료 기록</span>
+      <section className="mt-9">
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <h2 className="text-xl font-black tracking-[-0.03em] text-binu-ink">최근 12주</h2>
+          <span className="text-xs font-bold text-binu-muted">주간 완료 기록</span>
         </div>
-        <div className="footprint-grid">
-          {levels.map((level, index) => <span className={`foot-cell ${level ? `l${level}` : ""} ${index === levels.length - 1 ? "now" : ""}`} key={`${level}-${index}`} />)}
-        </div>
+        <Card className="border-binu-line bg-white shadow-none">
+          <CardContent className="grid grid-cols-12 gap-1.5">
+            {levels.map((level, index) => (
+              <span
+                className={cn(
+                  "aspect-square rounded-[4px] bg-binu-mist",
+                  level === 1 && "bg-[#D8ECF9]",
+                  level === 2 && "bg-binu-sky",
+                  level === 3 && "bg-binu-navy",
+                  index === levels.length - 1 && "outline-2 outline-offset-2 outline-binu-navy",
+                )}
+                key={`${level}-${index}`}
+              />
+            ))}
+          </CardContent>
+        </Card>
       </section>
-      <section className="section">
-        <div className="section-head"><h2>메뉴</h2></div>
-        <div className="menu-list">
-          <button className="menu-row" type="button" onClick={onHistory}><span>완료 히스토리</span><strong>이번 달 {logs.length}개</strong><em>›</em></button>
-          <button className="menu-row" type="button" onClick={onSaved}><span>저장한 셀렉션</span><strong>{savedCount}개 담김</strong><em>›</em></button>
-          <button className="menu-row" type="button" onClick={onSavedCommunity}><span>저장한 커뮤니티</span><strong>{savedCommunityPosts.length}개 저장</strong><em>›</em></button>
-          <button className="menu-row" type="button" onClick={onAuthoredCommunity}><span>내 커뮤니티 글</span><strong>{authoredCommunityPosts.length}개 작성</strong><em>›</em></button>
-          <button className="menu-row" type="button" onClick={onManageCycle}><span>주기 관리</span><strong>{categories.length}개 사용 중</strong><em>›</em></button>
-          <button className="menu-row" type="button"><span>알림 설정</span><strong>조용한 알림</strong><em>›</em></button>
-        </div>
+      <section className="mt-9">
+        <div className="mb-4"><h2 className="text-xl font-black tracking-[-0.03em] text-binu-ink">비누 노트와 설정</h2></div>
+        <Card className="gap-0 border-binu-line bg-white py-0 shadow-none">
+          <MenuRow icon={History} label="비누 기록" detail={`이번 달 ${logs.length}개`} onClick={onHistory} />
+          <MenuRow icon={BookmarkCheck} label="저장한 비누 픽" detail={`${savedCount}개 담김`} onClick={onSaved} />
+          <MenuRow icon={MessageSquareHeart} label="저장한 커뮤니티" detail={`${savedCommunityPosts.length}개 저장`} onClick={onSavedCommunity} />
+          <MenuRow icon={PenLine} label="내 커뮤니티 글" detail={`${authoredCommunityPosts.length}개 작성`} onClick={onAuthoredCommunity} />
+          <MenuRow icon={CalendarClock} label="주기 관리" detail={`${categories.length}개 사용 중`} onClick={onManageCycle} />
+          <MenuRow icon={Bell} label="알림 설정" detail="조용한 알림" />
+        </Card>
       </section>
     </section>
   );
 }
 
+function MenuRow({
+  icon: Icon,
+  label,
+  detail,
+  onClick,
+}: {
+  icon: typeof History;
+  label: string;
+  detail: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button className="grid min-h-14 w-full grid-cols-[34px_1fr_auto_auto] items-center gap-3 border-b border-binu-line px-3 py-2 text-left transition last:border-b-0 hover:bg-binu-sky-soft/50" type="button" onClick={onClick}>
+      <span className="grid size-[34px] place-items-center rounded-lg bg-binu-sky-soft text-binu-navy" aria-hidden="true"><Icon size={18} /></span>
+      <span className="text-xs font-extrabold text-binu-ink">{label}</span>
+      <strong className="text-[10px] font-bold text-binu-muted">{detail}</strong>
+      <ChevronRight className="size-4 text-binu-muted" aria-hidden="true" />
+    </button>
+  );
+}
+
 function InfoTile({ value, label }: { value: string | number; label: string }) {
   return (
-    <article className="info-tile">
-      <strong>{value}</strong>
-      <span>{label}</span>
-    </article>
+    <Card className="min-h-20 border-binu-line bg-white shadow-none">
+      <CardContent className="flex h-full flex-col justify-between">
+        <strong className="block truncate text-lg font-black text-binu-navy">{value}</strong>
+        <span className="mt-2 block text-[10px] font-bold leading-4 text-binu-muted">{label}</span>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1638,7 +1785,7 @@ function CycleManager({
   onCycleChange: (presetId: string, cycleDays: number) => void;
 }) {
   return (
-    <div className="cycle-manager-list">
+    <div className="grid gap-3">
       {presets.map((preset) => {
         const activeCategory = findCategoryForPreset(preset, categories);
         const draftItem = draft[preset.id];
@@ -1647,33 +1794,40 @@ function CycleManager({
         const canChangeCycle = editing && enabled && !saving;
         const canToggle = editing && !activeCategory && !saving;
         return (
-          <article className={`cycle-toggle-row ${enabled ? "enabled" : ""} ${editing ? "editing" : ""}`} key={preset.id}>
-            <IconTile icon={preset.icon} size={42} />
-            <div>
-              <strong>{preset.name}</strong>
-              <span>{activeCategory ? "서버에 저장됨" : enabled ? "저장하면 새 주기로 추가됨" : "아직 추가되지 않음"} · {cycleDays}일 주기 · {preset.note}</span>
+          <Card className={cn("border-binu-line bg-white shadow-none", enabled && "border-binu-sky bg-[linear-gradient(135deg,#FFFFFF,#E7F1FB)]")} key={preset.id}>
+            <CardContent className="grid grid-cols-[42px_1fr_auto] items-start gap-3">
+              <IconTile icon={preset.icon} size={42} />
+              <div className="min-w-0">
+              <strong className="block text-sm font-extrabold text-binu-ink">{preset.name}</strong>
+              <span className="mt-1 block text-[10px] font-medium leading-5 text-binu-muted">{activeCategory ? "서버에 저장됨" : enabled ? "저장하면 새 주기로 추가됨" : "아직 추가되지 않음"} · {cycleDays}일 주기 · {preset.note}</span>
               {editing ? (
-                <div className="cycle-input-row">
-                  <button type="button" disabled={!canChangeCycle || cycleDays === ALLOWED_CYCLE_DAYS[0]} onClick={() => onCycleChange(preset.id, stepCycleDays(cycleDays, -1))}>-</button>
-                  <div className="cycle-choice-row" role="group" aria-label={`${preset.name} 주기 선택`}>
+                <div className="mt-3 grid grid-cols-[28px_1fr_28px] items-center gap-1.5">
+                  <Button variant="quiet" size="icon-sm" type="button" aria-label={`${preset.name} 주기 줄이기`} disabled={!canChangeCycle || cycleDays === ALLOWED_CYCLE_DAYS[0]} onClick={() => onCycleChange(preset.id, stepCycleDays(cycleDays, -1))}>
+                    <Minus size={15} aria-hidden="true" />
+                  </Button>
+                  <div className="grid grid-cols-5 gap-1" role="group" aria-label={`${preset.name} 주기 선택`}>
                     {ALLOWED_CYCLE_DAYS.map((days) => (
-                      <button
+                      <Button
                         key={days}
-                        className={days === cycleDays ? "selected" : ""}
+                        className="px-0"
+                        variant={days === cycleDays ? "binu" : "quiet"}
+                        size="icon-sm"
                         type="button"
                         disabled={!canChangeCycle}
                         onClick={() => onCycleChange(preset.id, days)}
                       >
                         {days}
-                      </button>
+                      </Button>
                     ))}
                   </div>
-                  <button type="button" disabled={!canChangeCycle || cycleDays === ALLOWED_CYCLE_DAYS[ALLOWED_CYCLE_DAYS.length - 1]} onClick={() => onCycleChange(preset.id, stepCycleDays(cycleDays, 1))}>+</button>
+                  <Button variant="quiet" size="icon-sm" type="button" aria-label={`${preset.name} 주기 늘리기`} disabled={!canChangeCycle || cycleDays === ALLOWED_CYCLE_DAYS[ALLOWED_CYCLE_DAYS.length - 1]} onClick={() => onCycleChange(preset.id, stepCycleDays(cycleDays, 1))}>
+                    <Plus size={15} aria-hidden="true" />
+                  </Button>
                 </div>
               ) : null}
             </div>
             <button
-              className={`toggle-switch ${enabled ? "on" : ""}`}
+              className={cn("relative h-[22px] w-[38px] rounded-full bg-binu-mist transition disabled:opacity-70", enabled && "bg-binu-navy")}
               type="button"
               role="switch"
               aria-checked={enabled}
@@ -1681,9 +1835,10 @@ function CycleManager({
               disabled={!canToggle}
               onClick={() => onToggle(preset.id)}
             >
-              <span />
+              <span className={cn("absolute left-[3px] top-[3px] size-4 rounded-full bg-white shadow-sm transition", enabled && "translate-x-4")} />
             </button>
-          </article>
+            </CardContent>
+          </Card>
         );
       })}
     </div>
@@ -1692,24 +1847,37 @@ function CycleManager({
 
 function InfoBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="info-block">
-      <h3>{title}</h3>
-      <p>{children}</p>
-    </section>
+    <Card size="sm" className="mt-3 border-binu-line bg-background shadow-none">
+      <CardHeader><CardTitle className="text-xs font-extrabold text-binu-navy">{title}</CardTitle></CardHeader>
+      <CardContent><p className="text-xs leading-6 text-binu-text">{children}</p></CardContent>
+    </Card>
+  );
+}
+
+function DetailMetric({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
+  return (
+    <Card size="sm" className="border-binu-line bg-white shadow-none">
+      <CardContent className="min-w-0">
+        <span className="block text-[9px] font-bold text-binu-muted">{label}</span>
+        <strong className="mt-1 flex items-center gap-1 truncate text-[10px] font-extrabold text-binu-navy">{icon}{value}</strong>
+      </CardContent>
+    </Card>
   );
 }
 
 function HistoryList({ logs }: { logs: Log[] }) {
   return (
-    <div className="sheet-stack">
+    <div className="grid gap-3">
       {logs.map((log) => (
-        <div className="list-row" key={log.id}>
-          <IconTile icon={log.icon} size={42} />
-          <div>
-            <strong>{log.categoryName}</strong>
-            <span>{fmtDate(log.date)} · {log.method}</span>
-          </div>
-        </div>
+        <Card className="border-binu-line bg-white shadow-none" key={log.id}>
+          <CardContent className="grid grid-cols-[42px_1fr] items-center gap-3">
+            <IconTile icon={log.icon} size={42} />
+            <div className="min-w-0">
+              <strong className="block text-xs font-extrabold text-binu-ink">{log.categoryName}</strong>
+              <span className="mt-1 block text-[10px] font-bold text-binu-muted">{fmtDate(log.date)} · {log.method}</span>
+            </div>
+          </CardContent>
+        </Card>
       ))}
     </div>
   );
@@ -1717,13 +1885,13 @@ function HistoryList({ logs }: { logs: Log[] }) {
 
 function CommunityPostList({ posts, onOpen }: { posts: CommunityPost[]; onOpen: (post: CommunityPost) => void }) {
   return (
-    <div className="sheet-stack">
+    <div className="grid gap-3">
       {posts.map((post) => (
-        <button className="community-list-row" key={post.id} type="button" onClick={() => onOpen(post)}>
+        <button className="grid w-full grid-cols-[40px_1fr] items-center gap-3 rounded-lg border border-binu-line bg-white p-3 text-left transition hover:border-binu-sky hover:bg-binu-sky-soft/40" key={post.id} type="button" onClick={() => onOpen(post)}>
           <IconTile icon={post.icon} size={40} />
-          <div>
-            <strong>{post.title}</strong>
-            <span>{post.category} · 도움 {post.helpful} · 저장 {post.saved}</span>
+          <div className="min-w-0">
+            <strong className="block truncate text-xs font-extrabold text-binu-ink">{post.title}</strong>
+            <span className="mt-1 block text-[10px] font-bold text-binu-muted">{post.category} · 도움 {post.helpful} · 저장 {post.saved}</span>
           </div>
         </button>
       ))}
@@ -1732,10 +1900,5 @@ function CommunityPostList({ posts, onOpen }: { posts: CommunityPost[]; onOpen: 
 }
 
 function EmptyState({ title, desc }: { title: string; desc: string }) {
-  return (
-    <div className="empty-state">
-      <strong>{title}</strong>
-      <span>{desc}</span>
-    </div>
-  );
+  return <BinuEmptyState title={title} description={desc} actionLabel={null} />;
 }

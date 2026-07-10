@@ -1,0 +1,63 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>비누 앱 아이콘 - 워드마크 비누</title>
+  <defs>
+    <linearGradient id="bg" x1="150" y1="96" x2="878" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E7F7FF"/>
+      <stop offset="0.46" stop-color="#A7D4F3"/>
+      <stop offset="1" stop-color="#77BCE2"/>
+    </linearGradient>
+    <radialGradient id="bgGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(310 246) rotate(53.6) scale(642 538)">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.82"/>
+      <stop offset="0.48" stop-color="#FFFFFF" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="soap" x1="300" y1="268" x2="718" y2="736" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFDF4"/>
+      <stop offset="0.42" stop-color="#FFF7E9"/>
+      <stop offset="1" stop-color="#EDE2CC"/>
+    </linearGradient>
+    <radialGradient id="soapHighlight" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(382 342) rotate(44.2) scale(396 288)">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.94"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="tileShadow" x="54" y="62" width="916" height="916" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="28" stdDeviation="38" flood-color="#2E4B66" flood-opacity="0.2"/>
+    </filter>
+    <filter id="soapShadow" x="164" y="208" width="732" height="622" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="36" stdDeviation="38" flood-color="#4F7EA0" flood-opacity="0.26"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#B28E5F" flood-opacity="0.12"/>
+    </filter>
+    <filter id="innerSoft" x="250" y="246" width="542" height="480" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <filter id="markEmboss" x="-26" y="-16" width="306" height="188" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="7" stdDeviation="5" flood-color="#CDBB9A" flood-opacity="0.62"/>
+      <feDropShadow dx="0" dy="-5" stdDeviation="4" flood-color="#FFFFFF" flood-opacity="0.82"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#tileShadow)">
+    <rect x="96" y="96" width="832" height="832" rx="210" fill="url(#bg)"/>
+    <rect x="96" y="96" width="832" height="832" rx="210" fill="url(#bgGlow)"/>
+  </g>
+
+  <g transform="rotate(-7 512 512)">
+    <g filter="url(#soapShadow)">
+      <rect x="238" y="304" width="548" height="384" rx="152" fill="url(#soap)"/>
+      <rect x="238" y="304" width="548" height="384" rx="152" fill="url(#soapHighlight)"/>
+      <rect x="258" y="324" width="508" height="344" rx="132" stroke="#FFFFFF" stroke-opacity="0.42" stroke-width="18"/>
+    </g>
+    <ellipse cx="512" cy="673" rx="230" ry="46" fill="#B28E5F" opacity="0.1" filter="url(#innerSoft)"/>
+    <g transform="translate(337 381) scale(1.42)" filter="url(#markEmboss)" opacity="0.95" fill="none" stroke="#E8D6B8" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M30 27V82C30 105 49 121 75 121H82C101 121 112 108 112 89V66H45"/>
+      <path d="M112 27V66"/>
+      <path d="M150 27V124"/>
+      <path d="M185 27V56C185 66 193 74 203 74H232"/>
+      <path d="M170 98H236"/>
+      <path d="M203 98V126"/>
+    </g>
+  </g>
+
+  <path d="M178 314C178 238.9 238.9 178 314 178H710C785.1 178 846 238.9 846 314" stroke="#FFFFFF" stroke-opacity="0.28" stroke-width="26" stroke-linecap="round"/>
+</svg>
