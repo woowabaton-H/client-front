@@ -16,6 +16,12 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+API requests under `/api/v1/*` are proxied by `next.config.ts`.
+
+- Local default: `http://localhost:8080`
+- Vercel default: `https://server-spring-production.up.railway.app`
+- Override: set `BACKEND_ORIGIN` when a different backend URL is needed. Local uses `.env.local`; production uses `.env.production` or the Vercel `BACKEND_ORIGIN` environment variable.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
