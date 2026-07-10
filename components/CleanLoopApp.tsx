@@ -107,6 +107,8 @@ type Toast = { title: string; desc?: string };
 
 const ALLOWED_CYCLE_DAYS = [3, 7, 14, 21, 28] as const;
 const PAGE_LIMIT = 20;
+const BRAND_TAGLINE = "비우는 루틴, 누리는 하루.";
+const BRAND_ICON_SRC = "/binu/app-icon-main.png";
 const iconPath = (name: string) => `/cleanloop/icons/category-${name}.png`;
 
 const navigationItems = [
@@ -128,26 +130,9 @@ function fmtRelativeDate(input: string) {
   return new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric" }).format(new Date(input));
 }
 
-function fmtToday(input?: string) {
-  if (!input) return "오늘";
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "long",
-    timeZone: "Asia/Seoul",
-  }).format(new Date(`${input}T12:00:00+09:00`));
-}
-
 function statusKey(category: Category) {
   if (category.status.daysUntilNext < 0) return "late";
   return category.status.code;
-}
-
-function statusDateLabel(days: number) {
-  if (days < 0) return `${Math.abs(days)}일 지남`;
-  if (days === 0) return "오늘";
-  return `${days}일 남음`;
 }
 
 function statusPriority(category: Category) {
@@ -234,7 +219,6 @@ export function CleanLoopApp() {
   const [historyError, setHistoryError] = useState("");
 
   const [selections, setSelections] = useState<Selection[]>([]);
-  const [popularSelections, setPopularSelections] = useState<Selection[]>([]);
   const [savedSelections, setSavedSelections] = useState<Selection[]>([]);
   const [selectionDetail, setSelectionDetail] = useState<Selection | null>(null);
   const [selectionState, setSelectionState] = useState<LoadState>("loading");
@@ -244,7 +228,6 @@ export function CleanLoopApp() {
   const [selectionType, setSelectionType] = useState<SelectionTypeFilter>("all");
 
   const [communityPosts, setCommunityPosts] = useState<Record<CommunityTab, CommunityPost[]>>({ tips: [], qa: [] });
-  const [popularCommunity, setPopularCommunity] = useState<CommunityPost[]>([]);
   const [savedCommunity, setSavedCommunity] = useState<CommunityPost[]>([]);
   const [communityTags, setCommunityTags] = useState<string[]>([]);
   const [communityTab, setCommunityTab] = useState<CommunityTab>("tips");
@@ -308,12 +291,10 @@ export function CleanLoopApp() {
         setLogs(logPage.items.map((item) => mapCompletionLog(item, mappedCategories, mappedPresets)));
         setHistoryCursor(logPage.nextCursor);
         setSelections(mappedSelections);
-        setPopularSelections(mappedSelections.filter((item) => item.highlighted).slice(0, 2));
         setSavedSelections(savedData.map((item) => mapSelection(item, mappedPresets)));
         setSelectionCursor(selectionPage.nextCursor);
         setCommunityPosts({ tips: mappedTips, qa: mappedQa });
         setCommunityCursor({ tips: tipsPage.nextCursor, qa: qaPage.nextCursor });
-        setPopularCommunity([...mappedTips, ...mappedQa].filter((post) => post.popular).slice(0, 2));
         setCommunityTags(Array.from(new Set([...mappedTips, ...mappedQa].map((post) => post.tag))).filter(Boolean));
         setHistoryState("ready");
         setSelectionState("ready");
@@ -408,15 +389,6 @@ export function CleanLoopApp() {
     }
   };
 
-  const refreshPopularCommunity = async () => {
-    const [tips, qa] = await Promise.all([
-      getCommunityPosts({ type: "tips", limit: PAGE_LIMIT }),
-      getCommunityPosts({ type: "qa", limit: PAGE_LIMIT }),
-    ]);
-    const mapped = [...tips.items, ...qa.items].map(mapCommunitySummary);
-    setPopularCommunity(mapped.filter((post) => post.popular).slice(0, 2));
-  };
-
   const completeCategory = async (categoryId: string) => {
     setPendingId(categoryId);
     try {
@@ -491,7 +463,6 @@ export function CleanLoopApp() {
   const syncSelectionSavedState = (id: string, saved: boolean) => {
     const update = (item: Selection) => item.id === id ? { ...item, saved } : item;
     setSelections((items) => items.map(update));
-    setPopularSelections((items) => items.map(update));
     setSelectionDetail((item) => item ? update(item) : item);
   };
 
@@ -560,7 +531,7 @@ export function CleanLoopApp() {
       const comment = await createCommunityComment(activePost.id, body.trim());
       setComments((items) => [comment, ...items]);
       setActivePost((post) => post ? { ...post, replyCount: post.replyCount + 1 } : post);
-      await Promise.all([loadCommunity(activePost.type, communityTag, false), refreshPopularCommunity()]);
+      await loadCommunity(activePost.type, communityTag, false);
       showToast(activePost.type === "qa" ? "답변을 남겼어요" : "댓글을 남겼어요");
     } catch (error) {
       showToast("댓글을 저장하지 못했어요", errorMessageOf(error));
@@ -577,7 +548,7 @@ export function CleanLoopApp() {
         ? await unmarkCommunityHelpful(activePost.id)
         : await markCommunityHelpful(activePost.id);
       setActivePost((post) => post ? { ...post, helped: result.hasMarkedHelpful, helpfulCount: result.helpfulCount } : post);
-      await Promise.all([loadCommunity(activePost.type, communityTag, false), refreshPopularCommunity()]);
+      await loadCommunity(activePost.type, communityTag, false);
     } catch (error) {
       showToast("도움됨 상태를 바꾸지 못했어요", errorMessageOf(error));
     } finally {
@@ -596,7 +567,7 @@ export function CleanLoopApp() {
         saved: !post.saved,
         savedCount: Math.max(0, post.savedCount + (post.saved ? -1 : 1)),
       } : post);
-      await Promise.all([loadCommunity(activePost.type, communityTag, false), refreshPopularCommunity()]);
+      await loadCommunity(activePost.type, communityTag, false);
     } catch (error) {
       showToast("커뮤니티 저장 상태를 바꾸지 못했어요", errorMessageOf(error));
     } finally {
@@ -723,7 +694,7 @@ export function CleanLoopApp() {
           <div className="flex min-w-0 items-center gap-2.5">
             <Image
               className="size-10 shrink-0 rounded-[10px] shadow-[0_7px_18px_rgba(46,75,102,0.13)]"
-              src="/binu/app-icon-soap-wordmark.svg"
+              src={BRAND_ICON_SRC}
               alt=""
               width={40}
               height={40}
@@ -731,7 +702,7 @@ export function CleanLoopApp() {
             />
             <div>
               <div className="text-lg font-black leading-tight tracking-[-0.03em] text-binu-navy">비누</div>
-              <div className="mt-0.5 text-[10px] font-bold text-binu-muted">비우는 루틴, 누리는 하루</div>
+              <div className="mt-0.5 text-[10px] font-bold text-binu-muted">{BRAND_TAGLINE}</div>
             </div>
           </div>
           <Button className="relative" variant="quiet" size="icon-lg" type="button" aria-label="알림" onClick={() => void openNotifications()}>
@@ -748,21 +719,11 @@ export function CleanLoopApp() {
             <HomeView
               state={appState}
               home={home}
-              user={user}
               categories={sortedCategories}
-              logs={logs}
-              selections={popularSelections}
-              posts={popularCommunity}
-              presets={presets}
               pendingId={pendingId}
               onComplete={completeCategory}
               onManageCycle={openCycleManager}
               onHelp={openHelp}
-              onOpenSelection={(category) => {
-                setView("selection");
-                changeSelectionFilter(category);
-              }}
-              onOpenPost={(id) => void openCommunityPost(id)}
             />
           ) : null}
           {appState !== "error" && view === "selection" ? (
@@ -930,49 +891,19 @@ export function CleanLoopApp() {
   );
 }
 
-function HomeView({ state, home, user, categories, logs, selections, posts, presets, pendingId, onComplete, onManageCycle, onHelp, onOpenSelection, onOpenPost }: {
+function HomeView({ state, home, categories, pendingId, onComplete, onManageCycle, onHelp }: {
   state: LoadState;
   home: ApiHome | null;
-  user: ApiUser | null;
   categories: Category[];
-  logs: CompletionLog[];
-  selections: Selection[];
-  posts: CommunityPost[];
-  presets: CategoryPreset[];
   pendingId: string | null;
   onComplete: (id: string) => void;
   onManageCycle: () => void;
   onHelp: (name: string) => void;
-  onOpenSelection: (category: string) => void;
-  onOpenPost: (id: string) => void;
 }) {
-  const nearest = categories[0];
-  const dueCount = categories.filter((category) => category.status.daysUntilNext <= 0).length;
   return (
     <section className="h-full overflow-y-auto px-5 pb-8 pt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <DataState state={state} empty={!home}>
-        <Card className="relative overflow-hidden border-binu-line bg-[linear-gradient(145deg,#E7F1FB_0%,#FFFFFF_58%,#FFF7F0_100%)] shadow-[0_18px_50px_rgba(46,75,102,0.08)]">
-          <div className="pointer-events-none absolute -bottom-16 -right-10 size-36 rounded-full border-[24px] border-binu-sky/20" />
-          <CardContent className="relative grid grid-cols-[1fr_auto] gap-4 py-2">
-            <div>
-              <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-binu-muted">{fmtToday(home?.today)}</p>
-              <h1 className="mt-3 text-[27px] font-black leading-[1.25] tracking-[-0.04em] text-binu-ink">{user?.name ? `${user.name}님, ` : ""}오늘은<br />여기만 봐도 충분해요</h1>
-              <p className="mt-3 text-[13px] font-medium leading-6 text-binu-text">{home?.message}</p>
-            </div>
-            <div className="grid size-14 place-items-center self-start rounded-lg border border-white bg-white/80 text-binu-navy shadow-sm">
-              <div className="text-center"><strong className="block text-xl font-black leading-none">{home?.today.slice(-2)}</strong><span className="mt-1 block text-[10px] font-extrabold">오늘</span></div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <InfoTile value={categories.length} label="관리 중인 주기" />
-          <InfoTile value={home?.monthlyCompletionCount ?? 0} label="이번 달 완료" />
-          <InfoTile value={nearest ? statusDateLabel(nearest.status.daysUntilNext) : "-"} label={nearest ? `${nearest.name} 다음 관리` : "다음 관리"} />
-          <InfoTile value={dueCount} label="오늘 기준 항목" />
-        </div>
-
-        <section className="mt-9">
+        <section>
           <div className="mb-4 flex items-end justify-between gap-3">
             <div><span className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-binu-muted">Routine</span><h2 className="mt-1 text-xl font-black tracking-[-0.03em] text-binu-ink">오늘의 홈케어</h2></div>
             <Button variant="quiet" size="sm" type="button" onClick={onManageCycle}><Settings2 size={15} aria-hidden="true" />주기 관리</Button>
@@ -981,18 +912,6 @@ function HomeView({ state, home, user, categories, logs, selections, posts, pres
             {categories.length ? categories.map((category) => <CategoryCard key={category.id} category={category} busy={pendingId === category.id} onComplete={onComplete} onHelp={onHelp} />) : <EmptyState title="켜둔 주기가 없습니다" desc="주기 관리에서 서버 프리셋을 추가해보세요." />}
           </div>
         </section>
-
-        <section className="mt-9">
-          <div className="mb-4 flex items-end justify-between gap-3"><h2 className="text-xl font-black tracking-[-0.03em] text-binu-ink">최근 완료</h2><span className="text-xs font-bold text-binu-muted">서버 기록 최신순</span></div>
-          {logs.length ? <div className="-mx-5 flex snap-x gap-2 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{logs.slice(0, 5).map((log) => <Card className="min-w-28 snap-start border-binu-line bg-white shadow-none" key={log.id}><CardContent><IconTile icon={log.icon} size={34} /><strong className="mt-3 block text-xs font-extrabold text-binu-ink">{log.categoryName}</strong><span className="mt-1 block text-[10px] font-bold text-binu-muted">{fmtDate(log.completedAt)}</span></CardContent></Card>)}</div> : <EmptyState title="완료 기록이 없습니다" desc="했어요를 누르면 서버에 기록됩니다." />}
-        </section>
-
-        <HomeLinkSection title="인기 비누 픽" label="서버 추천">
-          {selections.length ? selections.map((item) => <HomeLink key={item.id} icon={item.icon} title={item.title} meta={`${item.category} · ${item.price}`} onClick={() => onOpenSelection(item.category)} />) : <EmptyState title="인기 셀렉션이 없습니다" desc="서버 추천이 등록되면 표시됩니다." />}
-        </HomeLinkSection>
-        <HomeLinkSection title="인기 커뮤니티" label="도움 받은 글">
-          {posts.length ? posts.map((post) => <HomeLink key={post.id} icon={iconForLabel(post.tag, presets)} title={post.title} meta={`#${post.tag} · 도움 ${post.helpfulCount}`} onClick={() => onOpenPost(post.id)} />) : <EmptyState title="인기 글이 없습니다" desc="인기 글이 생기면 표시됩니다." />}
-        </HomeLinkSection>
       </DataState>
     </section>
   );
@@ -1001,16 +920,7 @@ function HomeView({ state, home, user, categories, logs, selections, posts, pres
 function CategoryCard({ category, busy, onComplete, onHelp }: { category: Category; busy: boolean; onComplete: (id: string) => void; onHelp: (name: string) => void }) {
   const key = statusKey(category);
   const status = key === "good" ? "good" : key === "soon" ? "soon" : "due";
-  const progress = Math.min(100, Math.max(12, ((category.cycleDays - category.status.daysUntilNext) / category.cycleDays) * 100));
-  return <RoutineCard className="shadow-[0_18px_50px_rgba(46,75,102,0.08)]" title={category.name} description={category.note} schedule={`마지막 ${fmtDate(category.lastDoneAt)} · ${category.cycleDays}일 주기 · 다음 ${fmtDate(category.nextDueAt)}`} progress={progress} status={status} statusLabel={`${category.status.label} · ${statusDateLabel(category.status.daysUntilNext)}`} actionLabel="했어요" secondaryLabel="도움 보기" iconSrc={iconPath(category.icon)} busy={busy} onAction={() => onComplete(category.id)} onSecondaryAction={() => onHelp(category.name)} />;
-}
-
-function HomeLinkSection({ title, label, children }: { title: string; label: string; children: React.ReactNode }) {
-  return <section className="mt-9"><div className="mb-4 flex items-end justify-between gap-3"><h2 className="text-xl font-black tracking-[-0.03em] text-binu-ink">{title}</h2><span className="text-xs font-bold text-binu-muted">{label}</span></div><div className="grid gap-2">{children}</div></section>;
-}
-
-function HomeLink({ icon, title, meta, onClick }: { icon: string; title: string; meta: string; onClick: () => void }) {
-  return <button className="grid w-full grid-cols-[34px_1fr_auto] items-center gap-3 rounded-lg border border-binu-line bg-white p-3 text-left transition hover:border-binu-sky hover:bg-binu-sky-soft/40" type="button" onClick={onClick}><IconTile icon={icon} size={34} /><div className="min-w-0"><strong className="block truncate text-xs font-extrabold text-binu-ink">{title}</strong><span className="mt-1 block truncate text-[10px] font-bold text-binu-muted">{meta}</span></div><ChevronRight className="size-4 text-binu-navy" aria-hidden="true" /></button>;
+  return <RoutineCard className="shadow-[0_18px_50px_rgba(46,75,102,0.08)]" title={category.name} description={category.note} cycleLabel={`주기 ${category.cycleDays}일`} status={status} statusLabel={category.status.label} actionLabel="했어요" secondaryLabel="도움 보기" iconSrc={iconPath(category.icon)} busy={busy} onAction={() => onComplete(category.id)} onSecondaryAction={() => onHelp(category.name)} />;
 }
 
 function SelectionView({ state, error, items, presets, filter, type, nextCursor, pendingId, onFilter, onType, onToggleSave, onDetail, onMore }: {

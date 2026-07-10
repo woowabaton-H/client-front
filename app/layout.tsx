@@ -12,7 +12,7 @@ const notoSansKr = Noto_Sans_KR({
 
 export const metadata: Metadata = {
   title: "비누",
-  description: "비우는 루틴, 누리는 하루",
+  description: "비우는 루틴, 누리는 하루.",
 };
 
 export default function RootLayout({

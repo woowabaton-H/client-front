@@ -330,8 +330,7 @@ export default function DesignSystemPage() {
                 <RoutineCard
                   title="욕실 청소가 필요해요"
                   description="물때와 습기만 잡아도 관리가 쉬워져요."
-                  schedule="마지막 완료 14일 전"
-                  progress={82}
+                  cycleLabel="주기 14일"
                   status="due"
                   statusLabel="오늘 챙기면 좋아요"
                 />
