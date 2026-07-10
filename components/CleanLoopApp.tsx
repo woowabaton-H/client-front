@@ -1,7 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  completeCategoryById,
+  createCategoryFromPreset,
+  getCategoryPresets,
+  getHome,
+  updateCategoryCycle,
+  type ApiCategory,
+  type ApiCategoryPreset,
+  type ApiCompletionLog,
+} from "@/lib/cleanloop-api";
 
 type View = "home" | "selection" | "community" | "community-detail" | "my";
 type CommunityTab = "tips" | "qa";
@@ -14,11 +24,17 @@ type Category = {
   icon: string;
   cycleDays: number;
   lastDoneAt: string;
+  nextDueAt?: string;
   note: string;
+  status?: {
+    code: "due" | "soon" | "good";
+    label: string;
+    daysUntilNext: number;
+  };
 };
 
 type Log = {
-  id: number;
+  id: string | number;
   categoryName: string;
   icon: string;
   date: string;
@@ -73,13 +89,23 @@ type Sheet = {
 };
 
 type CycleDraft = Record<string, { enabled: boolean; cycleDays: number }>;
+type SyncState = "loading" | "ready" | "error";
+type CategoryPreset = {
+  id: string;
+  name: string;
+  icon: string;
+  defaultCycle: number;
+  lastDoneDaysAgo: number;
+  note: string;
+};
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const TODAY = new Date("2026-07-10T12:00:00+09:00");
+const TODAY = new Date();
+const ALLOWED_CYCLE_DAYS = [3, 7, 14, 21, 28] as const;
 
 const iconPath = (name: string) => `/cleanloop/icons/category-${name}.png`;
 
-const categoryPresets = [
+const categoryPresets: CategoryPreset[] = [
   { id: "laundry", name: "세탁/침구", icon: "laundry", defaultCycle: 14, lastDoneDaysAgo: 17, note: "수건 냄새와 침구 먼지를 같이 챙겨요." },
   { id: "bath", name: "욕실", icon: "bath", defaultCycle: 14, lastDoneDaysAgo: 14, note: "물때와 습기만 잡아도 관리가 쉬워져요." },
   { id: "kitchen", name: "주방", icon: "kitchen", defaultCycle: 7, lastDoneDaysAgo: 7, note: "배수구와 조리대 표면을 기준으로 잡아요." },
@@ -374,10 +400,16 @@ function fmtDate(input: string | Date) {
 }
 
 function nextDate(category: Category) {
+  if (category.nextDueAt) {
+    return new Date(category.nextDueAt);
+  }
   return addDays(new Date(category.lastDoneAt), category.cycleDays);
 }
 
 function daysUntilNext(category: Category) {
+  if (category.status) {
+    return category.status.daysUntilNext;
+  }
   return Math.ceil((nextDate(category).getTime() - TODAY.getTime()) / MS_PER_DAY);
 }
 
@@ -388,6 +420,13 @@ function isSameDay(a: Date, b: Date) {
 function categoryStatus(category: Category): { key: StatusKey; days: number; label: string } {
   if (isSameDay(new Date(category.lastDoneAt), TODAY)) {
     return { key: "doneToday", days: 0, label: "오늘 반짝" };
+  }
+  if (category.status) {
+    const days = category.status.daysUntilNext;
+    if (days < 0) return { key: "late", days, label: "살짝 밀렸어요" };
+    if (category.status.code === "due") return { key: "due", days, label: category.status.label };
+    if (category.status.code === "soon") return { key: "soon", days, label: category.status.label };
+    return { key: "good", days, label: category.status.label };
   }
   const left = daysUntilNext(category);
   if (left < 0) return { key: "late", days: left, label: "살짝 밀렸어요" };
@@ -415,6 +454,64 @@ function relatedSelectionsForCategory(categoryName: string) {
   return selectionItems.filter((item) => item.category === categoryName).map((item) => item.id);
 }
 
+function mapApiCategory(category: ApiCategory): Category {
+  return {
+    id: category.id,
+    category: category.name,
+    name: category.name,
+    icon: category.icon,
+    cycleDays: category.cycleDays,
+    lastDoneAt: category.lastDoneAt,
+    nextDueAt: category.nextDueAt,
+    note: category.note,
+    status: category.status,
+  };
+}
+
+function mapApiLog(log: ApiCompletionLog, categories: Category[]): Log {
+  const category = categories.find((item) => item.id === log.categoryId || item.name === log.categoryName);
+  const preset = presetForCategory(log.categoryName);
+
+  return {
+    id: log.id,
+    categoryName: log.categoryName,
+    icon: category?.icon ?? preset.icon,
+    date: log.completedAt,
+    method: "직접 완료",
+  };
+}
+
+function mapApiPreset(preset: ApiCategoryPreset): CategoryPreset {
+  return {
+    id: preset.key,
+    name: preset.name,
+    icon: preset.icon,
+    defaultCycle: preset.cycleDays,
+    lastDoneDaysAgo: preset.cycleDays,
+    note: preset.note,
+  };
+}
+
+function findCategoryForPreset(preset: CategoryPreset, items: Category[]) {
+  return items.find((category) => category.name === preset.name);
+}
+
+function normalizeCycleDays(cycleDays: number) {
+  return ALLOWED_CYCLE_DAYS.reduce((closest, value) => (
+    Math.abs(value - cycleDays) < Math.abs(closest - cycleDays) ? value : closest
+  ));
+}
+
+function stepCycleDays(current: number, direction: -1 | 1) {
+  const currentIndex = ALLOWED_CYCLE_DAYS.findIndex((value) => value === normalizeCycleDays(current));
+  const nextIndex = Math.max(0, Math.min(ALLOWED_CYCLE_DAYS.length - 1, currentIndex + direction));
+  return ALLOWED_CYCLE_DAYS[nextIndex];
+}
+
+function errorMessageOf(error: unknown) {
+  return error instanceof Error ? error.message : "잠시 후 다시 시도해주세요.";
+}
+
 function IconTile({ icon, size = 48 }: { icon: string; size?: number }) {
   return (
     <span className="category-icon" style={{ width: size, height: size }} aria-hidden="true">
@@ -427,6 +524,7 @@ export function CleanLoopApp() {
   const [view, setView] = useState<View>("home");
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [logs, setLogs] = useState<Log[]>(initialLogs);
+  const [cyclePresets, setCyclePresets] = useState<CategoryPreset[]>(categoryPresets);
   const [selectionFilter, setSelectionFilter] = useState("전체");
   const [communityTab, setCommunityTab] = useState<CommunityTab>("tips");
   const [communityCategoryFilter, setCommunityCategoryFilter] = useState("전체");
@@ -436,8 +534,41 @@ export function CleanLoopApp() {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [cycleManagerEditing, setCycleManagerEditing] = useState(false);
   const [cycleDraft, setCycleDraft] = useState<CycleDraft>({});
+  const [syncState, setSyncState] = useState<SyncState>("loading");
+  const [syncMessage, setSyncMessage] = useState("서버에서 주기 데이터를 불러오는 중입니다.");
+  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(null);
+  const [cycleSaving, setCycleSaving] = useState(false);
   const [toast, setToast] = useState<{ title: string; desc?: string } | null>(null);
   const [hasUnreadNotification, setHasUnreadNotification] = useState(true);
+
+  const loadCycleData = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setSyncState("loading");
+      setSyncMessage("서버에서 주기 데이터를 불러오는 중입니다.");
+    }
+
+    try {
+      const [home, presets] = await Promise.all([getHome(), getCategoryPresets()]);
+      const nextCategories = home.categories.map(mapApiCategory);
+      setCategories(nextCategories);
+      setLogs(home.recentLogs.map((log) => mapApiLog(log, nextCategories)));
+      setCyclePresets(presets.map(mapApiPreset));
+      setSyncState("ready");
+      setSyncMessage(home.message);
+      setHasUnreadNotification(home.categories.some((category) => category.status.daysUntilNext <= 0));
+    } catch (error) {
+      setSyncState("error");
+      setSyncMessage(errorMessageOf(error));
+    }
+  }, []);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      void loadCycleData();
+    }, 0);
+
+    return () => window.clearTimeout(handle);
+  }, [loadCycleData]);
 
   const sortedCategories = useMemo(
     () => categories.slice().sort((a, b) => statusPriority(a) - statusPriority(b)),
@@ -457,33 +588,44 @@ export function CleanLoopApp() {
     window.setTimeout(() => setToast(null), 2400);
   };
 
-  const completeCategory = (id: string) => {
+  const completeCategory = async (id: string) => {
     const category = categories.find((item) => item.id === id);
     if (!category) return;
-    const completedAt = TODAY.toISOString();
-    setCategories((items) => items.map((item) => (item.id === id ? { ...item, lastDoneAt: completedAt } : item)));
-    setLogs((items) => [
-      { id: Date.now(), categoryName: category.name, icon: category.icon, date: completedAt, method: "직접 완료" },
-      ...items,
-    ]);
-    showToast("했어요", `${category.name} 다음 주기는 제가 기억할게요.`);
+    setPendingCategoryId(id);
+
+    try {
+      const result = await completeCategoryById(id);
+      const updatedCategory = mapApiCategory(result.category);
+
+      setCategories((items) => items.map((item) => (item.id === id ? updatedCategory : item)));
+      setLogs((items) => [
+        mapApiLog(result.log, [updatedCategory, ...categories]),
+        ...items.filter((item) => item.id !== result.log.id),
+      ]);
+      setSyncState("ready");
+      showToast("했어요", result.toastMessage);
+    } catch (error) {
+      showToast("완료 기록에 실패했어요", errorMessageOf(error));
+    } finally {
+      setPendingCategoryId(null);
+    }
   };
 
-  const createCycleDraft = (items: Category[]): CycleDraft => Object.fromEntries(
-    categoryPresets.map((preset) => {
-      const category = items.find((entry) => entry.id === preset.id);
+  const createCycleDraft = (items: Category[], presets: CategoryPreset[]): CycleDraft => Object.fromEntries(
+    presets.map((preset) => {
+      const category = findCategoryForPreset(preset, items);
       return [
         preset.id,
         {
           enabled: Boolean(category),
-          cycleDays: category?.cycleDays ?? preset.defaultCycle,
+          cycleDays: normalizeCycleDays(category?.cycleDays ?? preset.defaultCycle),
         },
       ];
     }),
   );
 
   const updateCycleDraft = (presetId: string, cycleDays: number) => {
-    const days = Math.max(1, Math.min(90, Math.round(cycleDays)));
+    const days = normalizeCycleDays(cycleDays);
     setCycleDraft((draft) => ({
       ...draft,
       [presetId]: {
@@ -493,59 +635,71 @@ export function CleanLoopApp() {
     }));
   };
 
-  const categoryToCycle = (preset: (typeof categoryPresets)[number]): Category => ({
-    id: preset.id,
-    category: preset.name,
-    name: preset.name,
-    icon: preset.icon,
-    cycleDays: preset.defaultCycle,
-    lastDoneAt: addDays(TODAY, -preset.lastDoneDaysAgo).toISOString(),
-    note: preset.note,
-  });
-
   const toggleCycleDraft = (presetId: string) => {
+    const preset = cyclePresets.find((item) => item.id === presetId);
+    const activeCategory = preset ? findCategoryForPreset(preset, categories) : null;
+    if (activeCategory) return;
+
     setCycleDraft((draft) => ({
       ...draft,
       [presetId]: {
         enabled: !draft[presetId]?.enabled,
-        cycleDays: draft[presetId]?.cycleDays ?? categoryPresets.find((preset) => preset.id === presetId)?.defaultCycle ?? 7,
+        cycleDays: draft[presetId]?.cycleDays ?? preset?.defaultCycle ?? 7,
       },
     }));
   };
 
   const startCycleEditing = () => {
-    setCycleDraft(createCycleDraft(categories));
+    setCycleDraft(createCycleDraft(categories, cyclePresets));
     setCycleManagerEditing(true);
   };
 
   const cancelCycleEditing = () => {
-    setCycleDraft(createCycleDraft(categories));
+    setCycleDraft(createCycleDraft(categories, cyclePresets));
     setCycleManagerEditing(false);
   };
 
-  const saveCycleEditing = () => {
-    setCategories(
-      categoryPresets
-        .filter((preset) => cycleDraft[preset.id]?.enabled)
-        .map((preset) => {
-          const current = categories.find((category) => category.id === preset.id);
-          return {
-            ...(current ?? categoryToCycle(preset)),
-            cycleDays: cycleDraft[preset.id]?.cycleDays ?? preset.defaultCycle,
-          };
-        }),
-    );
-    setCycleManagerEditing(false);
-    showToast("주기 관리를 저장했어요", "홈에 바로 반영됩니다.");
+  const saveCycleEditing = async () => {
+    setCycleSaving(true);
+
+    try {
+      for (const preset of cyclePresets) {
+        const draftItem = cycleDraft[preset.id];
+        const activeCategory = findCategoryForPreset(preset, categories);
+
+        if (activeCategory) {
+          const nextCycleDays = draftItem?.cycleDays ?? activeCategory.cycleDays;
+          if (nextCycleDays !== activeCategory.cycleDays) {
+            await updateCategoryCycle(activeCategory.id, nextCycleDays);
+          }
+          continue;
+        }
+
+        if (draftItem?.enabled) {
+          const created = await createCategoryFromPreset(preset.id);
+          if (draftItem.cycleDays !== created.cycleDays) {
+            await updateCategoryCycle(created.id, draftItem.cycleDays);
+          }
+        }
+      }
+
+      await loadCycleData(false);
+      setCycleManagerEditing(false);
+      showToast("주기 관리를 저장했어요", "서버 데이터가 홈에 반영됐습니다.");
+    } catch (error) {
+      showToast("주기 저장에 실패했어요", errorMessageOf(error));
+    } finally {
+      setCycleSaving(false);
+    }
   };
 
   const openCycleManager = () => {
     setCycleManagerEditing(false);
-    setCycleDraft(createCycleDraft(categories));
+    setCycleDraft(createCycleDraft(categories, cyclePresets));
     setSheet({
       step: "주기 관리",
       title: "관리할 카테고리",
-      sub: "필요한 카테고리만 켜두고, 지금 필요 없는 카테고리는 잠시 제외할 수 있어요.",
+      sub: "서버에 저장된 주기를 수정하고, 아직 없는 프리셋은 새로 추가할 수 있어요.",
       kind: "cycleManager",
     });
   };
@@ -782,6 +936,9 @@ export function CleanLoopApp() {
               logs={logs}
               weeklyDone={weeklyDone}
               communityPosts={communityPosts}
+              syncState={syncState}
+              syncMessage={syncMessage}
+              pendingCategoryId={pendingCategoryId}
               onComplete={completeCategory}
               onManageCycle={openCycleManager}
               onOpenSelection={(category) => {
@@ -846,6 +1003,7 @@ export function CleanLoopApp() {
               savedCount={savedSelections.length}
               savedCommunityPosts={[...communityPosts.tips, ...communityPosts.qa].filter((post) => post.savedByMe)}
               authoredCommunityPosts={[...communityPosts.tips, ...communityPosts.qa].filter((post) => post.authored)}
+              onManageCycle={openCycleManager}
               onHistory={() => setSheet({ step: "마이", title: "완료 히스토리", body: <HistoryList logs={logs} /> })}
               onSaved={() => {
                 const saved = selectionItems.filter((item) => savedSelections.includes(item.id));
@@ -943,7 +1101,9 @@ export function CleanLoopApp() {
                     cycleManagerEditing ? (
                       <>
                         <button className="sheet-text-action" type="button" onClick={cancelCycleEditing}>취소</button>
-                        <button className="sheet-save-action" type="button" onClick={saveCycleEditing}>저장</button>
+                        <button className="sheet-save-action" type="button" disabled={cycleSaving} onClick={saveCycleEditing}>
+                          {cycleSaving ? "저장 중" : "저장"}
+                        </button>
                       </>
                     ) : (
                       <button className="sheet-save-action" type="button" onClick={startCycleEditing}>주기 수정하기</button>
@@ -966,8 +1126,10 @@ export function CleanLoopApp() {
                 {sheet.kind === "cycleManager" ? (
                   <CycleManager
                     categories={categories}
+                    presets={cyclePresets}
                     draft={cycleDraft}
                     editing={cycleManagerEditing}
+                    saving={cycleSaving}
                     onToggle={toggleCycleDraft}
                     onCycleChange={updateCycleDraft}
                   />
@@ -998,6 +1160,9 @@ function HomeView({
   logs,
   weeklyDone,
   communityPosts,
+  syncState,
+  syncMessage,
+  pendingCategoryId,
   onComplete,
   onManageCycle,
   onOpenSelection,
@@ -1008,7 +1173,10 @@ function HomeView({
   logs: Log[];
   weeklyDone: number;
   communityPosts: Record<CommunityTab, CommunityPost[]>;
-  onComplete: (id: string) => void;
+  syncState: SyncState;
+  syncMessage: string;
+  pendingCategoryId: string | null;
+  onComplete: (id: string) => void | Promise<void>;
   onManageCycle: () => void;
   onOpenSelection: (category: string) => void;
   onOpenCommunity: (post: CommunityPost) => void;
@@ -1030,7 +1198,7 @@ function HomeView({
         <div>
           <p className="eyebrow">2026년 7월 10일 금요일</p>
           <h1>보송님, 오늘은 여기만 봐도 충분해요</h1>
-          <p>다 한 일은 했어요만 눌러주세요. 다음 주기는 제가 기억할게요.</p>
+          <p>{syncState === "loading" || syncState === "error" ? syncMessage : "다 한 일은 했어요만 눌러주세요. 다음 주기는 제가 기억할게요."}</p>
         </div>
         <div className="today-chip"><strong>10</strong><span>금</span></div>
       </div>
@@ -1049,7 +1217,13 @@ function HomeView({
         </div>
         <div className="stack">
           {categories.length ? categories.map((category) => (
-            <CategoryCard key={category.id} category={category} onComplete={onComplete} onHelp={onHelp} />
+            <CategoryCard
+              key={category.id}
+              category={category}
+              busy={pendingCategoryId === category.id}
+              onComplete={onComplete}
+              onHelp={onHelp}
+            />
           )) : <EmptyState title="켜둔 주기가 없습니다" desc="주기 관리에서 필요한 카테고리를 켜두면 홈에 표시됩니다." />}
         </div>
       </section>
@@ -1111,11 +1285,13 @@ function HomeView({
 
 function CategoryCard({
   category,
+  busy,
   onComplete,
   onHelp,
 }: {
   category: Category;
-  onComplete: (id: string) => void;
+  busy: boolean;
+  onComplete: (id: string) => void | Promise<void>;
   onHelp: (categoryName: string) => void;
 }) {
   const status = categoryStatus(category);
@@ -1132,7 +1308,9 @@ function CategoryCard({
       </div>
       <p className="task-note">{category.note}</p>
       <div className="task-actions">
-        <button className="primary-button" type="button" onClick={() => onComplete(category.id)}>했어요</button>
+        <button className="primary-button" type="button" disabled={busy} onClick={() => onComplete(category.id)}>
+          {busy ? "기록 중" : "했어요"}
+        </button>
         <button className="secondary-button" type="button" onClick={() => onHelp(category.category)}>도움 볼래요</button>
       </div>
     </article>
@@ -1375,6 +1553,7 @@ function MyView({
   savedCount,
   savedCommunityPosts,
   authoredCommunityPosts,
+  onManageCycle,
   onHistory,
   onSaved,
   onSavedCommunity,
@@ -1385,6 +1564,7 @@ function MyView({
   savedCount: number;
   savedCommunityPosts: CommunityPost[];
   authoredCommunityPosts: CommunityPost[];
+  onManageCycle: () => void;
   onHistory: () => void;
   onSaved: () => void;
   onSavedCommunity: () => void;
@@ -1423,7 +1603,7 @@ function MyView({
           <button className="menu-row" type="button" onClick={onSaved}><span>저장한 셀렉션</span><strong>{savedCount}개 담김</strong><em>›</em></button>
           <button className="menu-row" type="button" onClick={onSavedCommunity}><span>저장한 커뮤니티</span><strong>{savedCommunityPosts.length}개 저장</strong><em>›</em></button>
           <button className="menu-row" type="button" onClick={onAuthoredCommunity}><span>내 커뮤니티 글</span><strong>{authoredCommunityPosts.length}개 작성</strong><em>›</em></button>
-          <button className="menu-row" type="button"><span>주기 관리</span><strong>{categories.length}개 사용 중</strong><em>›</em></button>
+          <button className="menu-row" type="button" onClick={onManageCycle}><span>주기 관리</span><strong>{categories.length}개 사용 중</strong><em>›</em></button>
           <button className="menu-row" type="button"><span>알림 설정</span><strong>조용한 알림</strong><em>›</em></button>
         </div>
       </section>
@@ -1442,45 +1622,53 @@ function InfoTile({ value, label }: { value: string | number; label: string }) {
 
 function CycleManager({
   categories,
+  presets,
   draft,
   editing,
+  saving,
   onToggle,
   onCycleChange,
 }: {
   categories: Category[];
+  presets: CategoryPreset[];
   draft: CycleDraft;
   editing: boolean;
+  saving: boolean;
   onToggle: (presetId: string) => void;
   onCycleChange: (presetId: string, cycleDays: number) => void;
 }) {
   return (
     <div className="cycle-manager-list">
-      {categoryPresets.map((preset) => {
-        const activeCategory = categories.find((category) => category.id === preset.id);
+      {presets.map((preset) => {
+        const activeCategory = findCategoryForPreset(preset, categories);
         const draftItem = draft[preset.id];
         const enabled = editing ? Boolean(draftItem?.enabled) : Boolean(activeCategory);
         const cycleDays = editing ? draftItem?.cycleDays ?? preset.defaultCycle : activeCategory?.cycleDays ?? preset.defaultCycle;
+        const canChangeCycle = editing && enabled && !saving;
+        const canToggle = editing && !activeCategory && !saving;
         return (
           <article className={`cycle-toggle-row ${enabled ? "enabled" : ""} ${editing ? "editing" : ""}`} key={preset.id}>
             <IconTile icon={preset.icon} size={42} />
             <div>
               <strong>{preset.name}</strong>
-              <span>{cycleDays}일 주기 · {preset.note}</span>
+              <span>{activeCategory ? "서버에 저장됨" : enabled ? "저장하면 새 주기로 추가됨" : "아직 추가되지 않음"} · {cycleDays}일 주기 · {preset.note}</span>
               {editing ? (
                 <div className="cycle-input-row">
-                  <button type="button" disabled={!enabled} onClick={() => onCycleChange(preset.id, cycleDays - 1)}>-</button>
-                  <label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={90}
-                      value={cycleDays}
-                      disabled={!enabled}
-                      onChange={(event) => onCycleChange(preset.id, Number(event.target.value) || preset.defaultCycle)}
-                    />
-                    <span>일 주기</span>
-                  </label>
-                  <button type="button" disabled={!enabled} onClick={() => onCycleChange(preset.id, cycleDays + 1)}>+</button>
+                  <button type="button" disabled={!canChangeCycle || cycleDays === ALLOWED_CYCLE_DAYS[0]} onClick={() => onCycleChange(preset.id, stepCycleDays(cycleDays, -1))}>-</button>
+                  <div className="cycle-choice-row" role="group" aria-label={`${preset.name} 주기 선택`}>
+                    {ALLOWED_CYCLE_DAYS.map((days) => (
+                      <button
+                        key={days}
+                        className={days === cycleDays ? "selected" : ""}
+                        type="button"
+                        disabled={!canChangeCycle}
+                        onClick={() => onCycleChange(preset.id, days)}
+                      >
+                        {days}
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" disabled={!canChangeCycle || cycleDays === ALLOWED_CYCLE_DAYS[ALLOWED_CYCLE_DAYS.length - 1]} onClick={() => onCycleChange(preset.id, stepCycleDays(cycleDays, 1))}>+</button>
                 </div>
               ) : null}
             </div>
@@ -1489,8 +1677,8 @@ function CycleManager({
               type="button"
               role="switch"
               aria-checked={enabled}
-              aria-label={`${preset.name} 주기 ${enabled ? "끄기" : "켜기"}`}
-              disabled={!editing}
+              aria-label={`${preset.name} 주기 ${activeCategory ? "사용 중" : enabled ? "추가 취소" : "추가"}`}
+              disabled={!canToggle}
               onClick={() => onToggle(preset.id)}
             >
               <span />
