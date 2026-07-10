@@ -32,6 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { BrandEntryLoader } from "@/components/binu/brand-entry-loader";
 import { BinuPickCard } from "@/components/binu/binu-pick-card";
 import { EmptyState as BinuEmptyState } from "@/components/binu/empty-state";
 import { RoutineCard } from "@/components/binu/routine-card";
@@ -211,6 +212,10 @@ function DataState({ state, error, empty, children }: {
 export function CleanLoopApp() {
   const [view, setView] = useState<View>("home");
   const [appState, setAppState] = useState<LoadState>("loading");
+  const [entryIntroReady, setEntryIntroReady] = useState(false);
+  const [entryIntroHold] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("intro") === "hold",
+  );
   const [appError, setAppError] = useState("");
   const [home, setHome] = useState<ApiHome | null>(null);
   const [user, setUser] = useState<ApiUser | null>(null);
@@ -263,6 +268,11 @@ export function CleanLoopApp() {
     setToast({ title, desc });
     window.setTimeout(() => setToast(null), 2500);
   };
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setEntryIntroReady(true), 2200);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -704,6 +714,8 @@ export function CleanLoopApp() {
     void loadCommunity("tips", matchingTag, false);
   };
 
+  const showBrandEntry = entryIntroHold || appState === "loading" || !entryIntroReady;
+
   return (
     <div className="flex min-h-dvh justify-center bg-[#DDEAF3] md:items-center md:py-5">
       <div className="relative min-h-dvh w-full max-w-[430px] overflow-hidden bg-background shadow-[0_24px_90px_rgba(46,75,102,0.22)] md:h-[min(900px,calc(100dvh-2.5rem))] md:min-h-[700px] md:rounded-[26px] md:border md:border-white/80" role="application" aria-label="비누">
@@ -908,6 +920,10 @@ export function CleanLoopApp() {
             <CheckCircle2 size={20} aria-hidden="true" />
             <div><strong className="block text-xs font-extrabold">{toast.title}</strong>{toast.desc ? <small className="mt-1 block text-[10px] text-white/70">{toast.desc}</small> : null}</div>
           </div>
+        ) : null}
+
+        {showBrandEntry ? (
+          <BrandEntryLoader />
         ) : null}
       </div>
     </div>
