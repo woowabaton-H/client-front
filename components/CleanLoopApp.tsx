@@ -20,6 +20,7 @@ import {
   PenLine,
   Pencil,
   Plus,
+  RefreshCcw,
   Send,
   Settings2,
   Star,
@@ -43,6 +44,7 @@ import {
   createCategoryFromPreset,
   createCommunityComment,
   createCommunityPost,
+  deleteCategory,
   getCategoryPresets,
   getCommunityComments,
   getCommunityPost,
@@ -59,6 +61,7 @@ import {
   readAllNotifications,
   readNotification,
   recordExternalView,
+  resetDemoDataToSeed,
   saveCommunityPost,
   saveSelection,
   unmarkCommunityHelpful,
@@ -244,6 +247,7 @@ export function CleanLoopApp() {
   const [toast, setToast] = useState<Toast | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [mutationBusy, setMutationBusy] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
   const [cycleDraft, setCycleDraft] = useState<CycleDraft>({});
   const [cycleEditing, setCycleEditing] = useState(false);
 
@@ -641,6 +645,10 @@ export function CleanLoopApp() {
         const category = findCategoryForPreset(preset, categories);
         const draft = cycleDraft[preset.id];
         if (!draft) continue;
+        if (category && !draft.enabled) {
+          await deleteCategory(category.id);
+          continue;
+        }
         if (!category && draft.enabled) await createCategoryFromPreset(preset.id);
         if (category && draft.enabled && category.cycleDays !== draft.cycleDays) {
           await updateCategoryCycle(category.id, draft.cycleDays);
@@ -653,6 +661,76 @@ export function CleanLoopApp() {
       showToast("주기 저장에 실패했어요", errorMessageOf(error));
     } finally {
       setMutationBusy(false);
+    }
+  };
+
+  const handleDemoDataReset = async () => {
+    if (resetBusy) return;
+    const confirmed = window.confirm(
+      "시연 데이터를 시드 상태로 복구할까요? 현재 프로필, 완료 기록, 저장 상태, 커뮤니티 반응이 모두 초기화됩니다.",
+    );
+    if (!confirmed) return;
+
+    setResetBusy(true);
+    setSheet(null);
+    setCycleEditing(false);
+    try {
+      const result = await resetDemoDataToSeed();
+      const [homeData, presetData, userData, summaryData, logPage, selectionPage, savedData, tipsPage, qaPage] =
+        await Promise.all([
+          getHome(),
+          getCategoryPresets(),
+          getMe(),
+          getMeSummary(),
+          getCompletionLogs({ limit: PAGE_LIMIT }),
+          getSelections({ limit: PAGE_LIMIT }),
+          getSavedSelections(),
+          getCommunityPosts({ type: "tips", limit: PAGE_LIMIT }),
+          getCommunityPosts({ type: "qa", limit: PAGE_LIMIT }),
+        ]);
+
+      const mappedPresets = presetData.map(mapCategoryPreset);
+      const mappedCategories = homeData.categories.map(mapCategory);
+      const mappedSelections = selectionPage.items.map((item) => mapSelection(item, mappedPresets));
+      const mappedTips = tipsPage.items.map(mapCommunitySummary);
+      const mappedQa = qaPage.items.map(mapCommunitySummary);
+
+      setHome(homeData);
+      setUser(userData);
+      setSummary(summaryData);
+      setCategories(mappedCategories);
+      setPresets(mappedPresets);
+      setUnreadCount(homeData.unreadNotificationCount);
+      setLogs(logPage.items.map((item) => mapCompletionLog(item, mappedCategories, mappedPresets)));
+      setHistoryCursor(logPage.nextCursor);
+      setSelections(mappedSelections);
+      setSavedSelections(savedData.map((item) => mapSelection(item, mappedPresets)));
+      setSelectionCursor(selectionPage.nextCursor);
+      setSelectionFilter("all");
+      setSelectionType("all");
+      setCommunityPosts({ tips: mappedTips, qa: mappedQa });
+      setCommunityCursor({ tips: tipsPage.nextCursor, qa: qaPage.nextCursor });
+      setCommunityTags(Array.from(new Set([...mappedTips, ...mappedQa].map((post) => post.tag))).filter(Boolean));
+      setCommunityTab("tips");
+      setCommunityTag("all");
+      setSavedCommunity([]);
+      setActivePost(null);
+      setComments([]);
+      setCommentCursor(null);
+      setSelectionDetail(null);
+      setHistoryState("ready");
+      setSelectionState("ready");
+      setCommunityState("ready");
+      setAppState("ready");
+      setAppError("");
+      showToast(
+        "시드 데이터로 복구했어요",
+        `주기 ${result.tableCounts.cleaning_categories ?? 0}개 · 기록 ${result.tableCounts.completion_logs ?? 0}건`,
+      );
+    } catch (error) {
+      showToast("시드 복구에 실패했어요", errorMessageOf(error));
+    } finally {
+      setResetBusy(false);
     }
   };
 
@@ -754,11 +832,6 @@ export function CleanLoopApp() {
               nextCursor={communityCursor[communityTab]}
               onTab={changeCommunityTab}
               onTag={changeCommunityTag}
-              onWrite={() => setSheet({
-                kind: "community-composer",
-                title: communityTab === "qa" ? "궁금한 청소 문제를 남겨요" : "내 청소 팁을 공유해요",
-                sub: "작성한 내용은 서버 커뮤니티에 바로 등록됩니다.",
-              })}
               onOpen={(id) => void openCommunityPost(id)}
               onMore={() => void loadCommunity(communityTab, communityTag, true)}
               presets={presets}
@@ -795,6 +868,8 @@ export function CleanLoopApp() {
               onHistory={() => setSheet({ kind: "history", title: "완료 히스토리", sub: "최신 완료부터 불러옵니다." })}
               onSaved={() => setSheet({ kind: "saved-selections", title: "저장한 셀렉션", sub: "서버에 저장한 항목입니다." })}
               onSavedCommunity={() => void openSavedCommunity()}
+              resetBusy={resetBusy}
+              onResetDemoData={() => void handleDemoDataReset()}
             />
           ) : null}
         </main>
@@ -819,6 +894,23 @@ export function CleanLoopApp() {
             );
           })}
         </nav>
+
+        {appState !== "error" && view === "community" ? (
+          <Button
+            className="absolute bottom-[calc(88px+env(safe-area-inset-bottom,0px))] right-5 z-60 size-12 rounded-full shadow-[0_18px_44px_rgba(46,75,102,0.26)]"
+            variant="binu"
+            size="icon-lg"
+            type="button"
+            aria-label={communityTab === "qa" ? "질문 작성" : "팁 작성"}
+            onClick={() => setSheet({
+              kind: "community-composer",
+              title: communityTab === "qa" ? "궁금한 청소 문제를 남겨요" : "내 청소 팁을 공유해요",
+              sub: "작성한 내용은 서버 커뮤니티에 바로 등록됩니다.",
+            })}
+          >
+            <PenLine size={22} aria-hidden="true" />
+          </Button>
+        ) : null}
 
         {sheet ? (
           <div className="absolute inset-0 z-80 flex items-end bg-binu-ink/35 backdrop-blur-[4px] animate-in fade-in duration-200 md:rounded-[26px]" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" onClick={closeSheet}>
@@ -928,14 +1020,17 @@ function SelectionView({ state, error, items, presets, filter, type, nextCursor,
   onFilter: (value: string) => void; onType: (value: SelectionTypeFilter) => void; onToggleSave: (item: Selection) => void; onDetail: (item: Selection) => void; onMore: () => void;
 }) {
   return <section className="h-full overflow-y-auto px-5 pb-8 pt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-    <Card className="relative overflow-hidden border-binu-line bg-[linear-gradient(145deg,#FFF7F0_0%,#FFFFFF_72%)] shadow-[0_18px_50px_rgba(46,75,102,0.08)]">
-      <CardContent>
-        <div className="grid size-11 place-items-center rounded-lg border border-binu-line bg-white text-binu-navy shadow-sm" aria-hidden="true"><PackageSearch className="size-5" /></div>
-        <p className="mt-5 text-[11px] font-extrabold uppercase tracking-[0.12em] text-binu-muted">Binu Pick · 상황별로 고른 선택지</p>
-        <h1 className="mt-3 text-[29px] font-black leading-[1.2] tracking-[-0.04em] text-binu-ink">검색은 비우고,<br />선택은 가볍게.</h1>
-        <p className="mt-3 text-sm font-medium leading-7 text-binu-text">카테고리와 유형을 서버에서 필터링해 지금 필요한 선택지만 가볍게 좁혀보세요.</p>
-      </CardContent>
-    </Card>
+    <h1 className="sr-only">비누 픽</h1>
+    <div className="relative h-[166px] overflow-hidden rounded-[18px] border border-white/80 bg-white shadow-[0_18px_50px_rgba(46,75,102,0.12)]">
+      <Image
+        src="/binu/binu-pick-banner.png"
+        alt="비누 픽의 정체성을 담은 홈케어 선택지 배너"
+        fill
+        priority
+        sizes="390px"
+        className="object-cover"
+      />
+    </div>
     <div className="mt-4 grid grid-cols-3 rounded-lg border border-binu-line bg-white p-1" role="tablist" aria-label="셀렉션 유형">
       {(["all", "product", "service"] as const).map((value) => <Button className="w-full" variant={type === value ? "binu-soft" : "ghost"} role="tab" aria-selected={type === value} key={value} type="button" onClick={() => onType(value)}>{value === "all" ? "전체" : value === "product" ? "용품" : "서비스"}</Button>)}
     </div>
@@ -952,22 +1047,21 @@ function SelectionView({ state, error, items, presets, filter, type, nextCursor,
 
 function SelectionCard({ item, pending, onToggleSave, onDetail }: { item: Selection; pending: boolean; onToggleSave: (item: Selection) => void; onDetail: (item: Selection) => void }) {
   if (item.type === "service" || item.type === "subscription") {
-    return <ServiceCard title={item.title} description={item.reason} price={item.price} region={item.fitFor} review={item.reviews} rating={item.rating} source={item.affiliate} tags={item.tags} saved={item.saved} onSave={pending ? undefined : () => onToggleSave(item)} onOpen={() => onDetail(item)} />;
+    return <ServiceCard title={item.title} description={item.reason} price={item.price} region={item.fitFor} review={item.reviews} rating={item.rating} source={item.affiliate} imageSrc={item.imageUrl} tags={item.tags} saved={item.saved} onSave={pending ? undefined : () => onToggleSave(item)} onOpen={() => onDetail(item)} />;
   }
-  return <BinuPickCard className={cn(item.highlighted && "border-binu-sky")} title={item.title} description={item.reason} price={item.price} rating={`${item.rating} · ${item.reviews}`} source={`${item.category} · ${item.typeLabel}`} tags={item.tags} saved={item.saved} saveLabel={pending ? "처리 중" : "비누 노트"} openLabel="자세히 보기" onSave={pending ? undefined : () => onToggleSave(item)} onOpen={() => onDetail(item)} />;
+  return <BinuPickCard className={cn(item.highlighted && "border-binu-sky")} title={item.title} description={item.reason} price={item.price} rating={`${item.rating} · ${item.reviews}`} source={`${item.category} · ${item.typeLabel}`} imageSrc={item.imageUrl ?? undefined} tags={item.tags} saved={item.saved} saveLabel={pending ? "처리 중" : "비누 노트"} openLabel="자세히 보기" onSave={pending ? undefined : () => onToggleSave(item)} onOpen={() => onDetail(item)} />;
 }
 
-function CommunityView({ state, error, posts, tab, tags, tag, nextCursor, onTab, onTag, onWrite, onOpen, onMore, presets }: {
+function CommunityView({ state, error, posts, tab, tags, tag, nextCursor, onTab, onTag, onOpen, onMore, presets }: {
   state: LoadState; error: string; posts: CommunityPost[]; tab: CommunityTab; tags: string[]; tag: string; nextCursor: string | null; presets: CategoryPreset[];
-  onTab: (tab: CommunityTab) => void; onTag: (tag: string) => void; onWrite: () => void; onOpen: (id: string) => void; onMore: () => void;
+  onTab: (tab: CommunityTab) => void; onTag: (tag: string) => void; onOpen: (id: string) => void; onMore: () => void;
 }) {
   return <section className="h-full overflow-y-auto px-5 pb-8 pt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
     <div className="mb-5"><p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-binu-muted">Community</p><h1 className="mt-2 text-[27px] font-black leading-[1.25] tracking-[-0.04em] text-binu-ink">막히는 청소 문제는<br />함께 해결해요</h1><p className="mt-3 text-sm font-medium leading-7 text-binu-text">글과 반응, 댓글까지 서버에 차곡차곡 저장됩니다.</p></div>
     <div className="grid grid-cols-2 rounded-lg border border-binu-line bg-white p-1" role="tablist" aria-label="커뮤니티 분류"><Button className="w-full" variant={tab === "tips" ? "binu-soft" : "ghost"} role="tab" aria-selected={tab === "tips"} type="button" onClick={() => onTab("tips")}>꿀팁 공유</Button><Button className="w-full" variant={tab === "qa" ? "binu-soft" : "ghost"} role="tab" aria-selected={tab === "qa"} type="button" onClick={() => onTab("qa")}>Q&amp;A</Button></div>
-    <Card className="mt-3 border-[#F6DDC5] bg-binu-cream shadow-none"><CardContent className="flex items-center justify-between gap-3"><p className="text-xs font-medium leading-5 text-binu-text">{tab === "qa" ? "서버 Q&A를 확인하고 경험을 답변으로 나눠보세요." : "경험 기반 팁을 태그별로 확인할 수 있어요."}</p><Button className="shrink-0" variant="binu" size="sm" type="button" onClick={onWrite}><PenLine size={16} aria-hidden="true" />{tab === "qa" ? "질문하기" : "팁 쓰기"}</Button></CardContent></Card>
     <div className="-mx-5 mt-4 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><Button className="shrink-0 rounded-full" variant={tag === "all" ? "binu" : "quiet"} size="sm" type="button" onClick={() => onTag("all")}>전체</Button>{tags.map((value) => <Button className="shrink-0 rounded-full" variant={tag === value ? "binu" : "quiet"} size="sm" key={value} type="button" onClick={() => onTag(value)}>#{value}</Button>)}</div>
     <DataState state={state} error={error} empty={!posts.length}>
-      <div className="mt-4 grid gap-3">{posts.map((post) => <button className="w-full rounded-lg border border-binu-line bg-white p-4 text-left shadow-[0_14px_38px_rgba(46,75,102,0.06)] transition hover:border-binu-sky hover:shadow-[0_18px_42px_rgba(46,75,102,0.10)]" key={post.id} type="button" onClick={() => onOpen(post.id)}><div className="grid grid-cols-[48px_1fr] gap-3"><IconTile icon={iconForLabel(post.tag, presets)} /><div className="min-w-0"><span className="inline-flex rounded-full border border-binu-line bg-binu-sky-soft px-2 py-1 text-[10px] font-extrabold text-binu-navy">{post.type === "qa" ? "Q&A" : "꿀팁"}</span><h3 className="mt-2 text-[15px] font-extrabold leading-6 text-binu-ink">{post.title}</h3><p className="mt-1 text-[10px] font-bold leading-5 text-binu-muted">#{post.tag} · {fmtRelativeDate(post.createdAt)} · 도움 {post.helpfulCount} · {post.type === "qa" ? "답변" : "댓글"} {post.replyCount}</p></div></div><p className="mt-4 text-xs font-medium leading-6 text-binu-text">{post.body}</p><span className="mt-4 inline-flex items-center gap-1 text-xs font-extrabold text-binu-navy">읽어보기 <ChevronRight size={15} aria-hidden="true" /></span></button>)}</div>
+      <div className="mt-4 grid gap-3">{posts.map((post) => <button className="w-full rounded-lg border border-binu-line bg-white p-4 text-left shadow-[0_14px_38px_rgba(46,75,102,0.06)] transition hover:border-binu-sky hover:shadow-[0_18px_42px_rgba(46,75,102,0.10)]" key={post.id} type="button" onClick={() => onOpen(post.id)}><div className="grid grid-cols-[64px_1fr] gap-3">{post.imageUrl ? <div className="relative h-16 overflow-hidden rounded-lg bg-binu-cream"><Image src={post.imageUrl} alt="" fill sizes="64px" className="object-cover" /></div> : <IconTile icon={iconForLabel(post.tag, presets)} size={64} />}<div className="min-w-0"><span className="inline-flex rounded-full border border-binu-line bg-binu-sky-soft px-2 py-1 text-[10px] font-extrabold text-binu-navy">{post.type === "qa" ? "Q&A" : "꿀팁"}</span><h3 className="mt-2 text-[15px] font-extrabold leading-6 text-binu-ink">{post.title}</h3><p className="mt-1 text-[10px] font-bold leading-5 text-binu-muted">#{post.tag} · {fmtRelativeDate(post.createdAt)} · 도움 {post.helpfulCount} · {post.type === "qa" ? "답변" : "댓글"} {post.replyCount}</p></div></div><p className="mt-4 text-xs font-medium leading-6 text-binu-text">{post.body}</p><span className="mt-4 inline-flex items-center gap-1 text-xs font-extrabold text-binu-navy">읽어보기 <ChevronRight size={15} aria-hidden="true" /></span></button>)}</div>
       {nextCursor ? <Button className="mt-4 w-full" variant="quiet" type="button" onClick={onMore}>더 불러오기</Button> : null}
     </DataState>
   </section>;
@@ -977,17 +1071,18 @@ function CommunityDetail({ state, error, post, comments, presets, busy, hasMoreC
   state: LoadState; error: string; post: CommunityPost | null; comments: ApiCommunityComment[]; presets: CategoryPreset[]; busy: boolean; hasMoreComments: boolean;
   onBack: () => void; onHelpful: () => void; onSave: () => void; onReply: (body: string) => void; onMoreComments: () => void; onOpenSelection: (tag: string) => void;
 }) {
-  return <section className="h-full overflow-y-auto px-5 pb-8 pt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><Button variant="ghost" size="sm" type="button" onClick={onBack}><ChevronLeft size={18} aria-hidden="true" />커뮤니티</Button><DataState state={state} error={error} empty={!post}>{post ? <Card className="mt-2 border-binu-line bg-white shadow-[0_18px_50px_rgba(46,75,102,0.08)]"><CardHeader><div className="grid grid-cols-[48px_1fr] gap-3"><IconTile icon={iconForLabel(post.tag, presets)} /><div className="min-w-0"><p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-binu-muted">커뮤니티 · #{post.tag}</p><h1 className="mt-2 text-xl font-black leading-7 tracking-[-0.03em] text-binu-ink">{post.title}</h1><p className="mt-2 text-[10px] font-bold leading-5 text-binu-muted">{fmtRelativeDate(post.createdAt)} · 도움 {post.helpfulCount} · 저장 {post.savedCount} · {post.type === "qa" ? "답변" : "댓글"} {post.replyCount}</p></div></div></CardHeader><CardContent><Separator className="mb-4 bg-binu-line" /><div className="flex gap-2"><Button variant={post.helped ? "binu-soft" : "quiet"} size="sm" type="button" disabled={busy} onClick={onHelpful}><ThumbsUp size={16} aria-hidden="true" />도움 {post.helpfulCount}</Button><Button variant={post.saved ? "binu-soft" : "quiet"} size="sm" type="button" disabled={busy} onClick={onSave}>{post.saved ? <BookmarkCheck size={16} aria-hidden="true" /> : <Bookmark size={16} aria-hidden="true" />}{post.saved ? "저장됨" : "저장"} {post.savedCount}</Button></div><InfoBlock title="내용">{post.body}</InfoBlock><Card size="sm" className="mt-3 border-binu-line bg-background shadow-none"><CardHeader><CardTitle className="text-xs font-extrabold text-binu-navy">{post.type === "qa" ? "답변" : "댓글"}</CardTitle></CardHeader><CardContent><form className="grid grid-cols-[1fr_auto] gap-2" onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); const body = String(form.get("reply") ?? "").trim(); if (body) { onReply(body); event.currentTarget.reset(); } }}><Input className="h-9 bg-white" name="reply" placeholder={post.type === "qa" ? "답변을 남겨주세요" : "댓글을 남겨주세요"} /><Button variant="binu" type="submit" disabled={busy} aria-label={post.type === "qa" ? "답변 등록" : "댓글 등록"}><Send size={16} aria-hidden="true" />{busy ? "저장 중" : "등록"}</Button></form><div className="mt-3 grid gap-2">{comments.length ? comments.map((comment) => <p className="rounded-lg border border-binu-line bg-white px-3 py-2 text-xs leading-6 text-binu-text" key={comment.id}><strong>{comment.authorName}{comment.authorIsMe ? " · 나" : ""}</strong><br />{comment.body}<br /><small className="text-binu-muted">{fmtRelativeDate(comment.createdAt)}</small></p>) : <p className="text-xs text-binu-muted">아직 등록된 {post.type === "qa" ? "답변" : "댓글"}이 없습니다.</p>}</div>{hasMoreComments ? <Button className="mt-3 w-full" variant="quiet" type="button" onClick={onMoreComments}>댓글 더 불러오기</Button> : null}</CardContent></Card><Card size="sm" className="mt-3 border-binu-line bg-background shadow-none"><CardHeader><CardTitle className="text-xs font-extrabold text-binu-navy">관련 비누 픽</CardTitle></CardHeader><CardContent><button className="grid w-full grid-cols-[34px_1fr_auto_auto] items-center gap-2 rounded-lg border border-binu-line bg-white p-2 text-left" type="button" onClick={() => onOpenSelection(post.tag)}><IconTile icon={iconForLabel(post.tag, presets)} size={34} /><span className="truncate text-[11px] font-bold text-binu-ink">#{post.tag} 관련 비누 픽 보기</span><strong className="text-[10px] font-extrabold text-binu-navy">이동</strong><ChevronRight className="size-4 text-binu-muted" aria-hidden="true" /></button></CardContent></Card></CardContent></Card> : null}</DataState></section>;
+  return <section className="h-full overflow-y-auto px-5 pb-8 pt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><Button variant="ghost" size="sm" type="button" onClick={onBack}><ChevronLeft size={18} aria-hidden="true" />커뮤니티</Button><DataState state={state} error={error} empty={!post}>{post ? <Card className="mt-2 border-binu-line bg-white shadow-[0_18px_50px_rgba(46,75,102,0.08)]"><CardHeader><div className="grid grid-cols-[48px_1fr] gap-3"><IconTile icon={iconForLabel(post.tag, presets)} /><div className="min-w-0"><p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-binu-muted">커뮤니티 · #{post.tag}</p><h1 className="mt-2 text-xl font-black leading-7 tracking-[-0.03em] text-binu-ink">{post.title}</h1><p className="mt-2 text-[10px] font-bold leading-5 text-binu-muted">{fmtRelativeDate(post.createdAt)} · 도움 {post.helpfulCount} · 저장 {post.savedCount} · {post.type === "qa" ? "답변" : "댓글"} {post.replyCount}</p></div></div></CardHeader><CardContent><Separator className="mb-4 bg-binu-line" />{post.imageUrl ? <div className="relative mb-4 aspect-video overflow-hidden rounded-lg bg-binu-cream"><Image src={post.imageUrl} alt="" fill sizes="360px" className="object-cover" /></div> : null}<div className="flex gap-2"><Button variant={post.helped ? "binu-soft" : "quiet"} size="sm" type="button" disabled={busy} onClick={onHelpful}><ThumbsUp size={16} aria-hidden="true" />도움 {post.helpfulCount}</Button><Button variant={post.saved ? "binu-soft" : "quiet"} size="sm" type="button" disabled={busy} onClick={onSave}>{post.saved ? <BookmarkCheck size={16} aria-hidden="true" /> : <Bookmark size={16} aria-hidden="true" />}{post.saved ? "저장됨" : "저장"} {post.savedCount}</Button></div><InfoBlock title="내용">{post.body}</InfoBlock><Card size="sm" className="mt-3 border-binu-line bg-background shadow-none"><CardHeader><CardTitle className="text-xs font-extrabold text-binu-navy">{post.type === "qa" ? "답변" : "댓글"}</CardTitle></CardHeader><CardContent><form className="grid grid-cols-[1fr_auto] gap-2" onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); const body = String(form.get("reply") ?? "").trim(); if (body) { onReply(body); event.currentTarget.reset(); } }}><Input className="h-9 bg-white" name="reply" placeholder={post.type === "qa" ? "답변을 남겨주세요" : "댓글을 남겨주세요"} /><Button variant="binu" type="submit" disabled={busy} aria-label={post.type === "qa" ? "답변 등록" : "댓글 등록"}><Send size={16} aria-hidden="true" />{busy ? "저장 중" : "등록"}</Button></form><div className="mt-3 grid gap-2">{comments.length ? comments.map((comment) => <p className="rounded-lg border border-binu-line bg-white px-3 py-2 text-xs leading-6 text-binu-text" key={comment.id}><strong>{comment.authorName}{comment.authorIsMe ? " · 나" : ""}</strong><br />{comment.body}<br /><small className="text-binu-muted">{fmtRelativeDate(comment.createdAt)}</small></p>) : <p className="text-xs text-binu-muted">아직 등록된 {post.type === "qa" ? "답변" : "댓글"}이 없습니다.</p>}</div>{hasMoreComments ? <Button className="mt-3 w-full" variant="quiet" type="button" onClick={onMoreComments}>댓글 더 불러오기</Button> : null}</CardContent></Card><Card size="sm" className="mt-3 border-binu-line bg-background shadow-none"><CardHeader><CardTitle className="text-xs font-extrabold text-binu-navy">관련 비누 픽</CardTitle></CardHeader><CardContent><button className="grid w-full grid-cols-[34px_1fr_auto_auto] items-center gap-2 rounded-lg border border-binu-line bg-white p-2 text-left" type="button" onClick={() => onOpenSelection(post.tag)}><IconTile icon={iconForLabel(post.tag, presets)} size={34} /><span className="truncate text-[11px] font-bold text-binu-ink">#{post.tag} 관련 비누 픽 보기</span><strong className="text-[10px] font-extrabold text-binu-navy">이동</strong><ChevronRight className="size-4 text-binu-muted" aria-hidden="true" /></button></CardContent></Card></CardContent></Card> : null}</DataState></section>;
 }
 
-function MyView({ state, summary, savedCommunityCount, onProfile, onManageCycle, onHistory, onSaved, onSavedCommunity }: {
-  state: LoadState; summary: ApiMeSummary | null; savedCommunityCount: number; onProfile: () => void; onManageCycle: () => void; onHistory: () => void; onSaved: () => void; onSavedCommunity: () => void;
+function MyView({ state, summary, savedCommunityCount, onProfile, onManageCycle, onHistory, onSaved, onSavedCommunity, resetBusy, onResetDemoData }: {
+  state: LoadState; summary: ApiMeSummary | null; savedCommunityCount: number; onProfile: () => void; onManageCycle: () => void; onHistory: () => void; onSaved: () => void; onSavedCommunity: () => void; resetBusy: boolean; onResetDemoData: () => void;
 }) {
   return <section className="h-full overflow-y-auto px-5 pb-8 pt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><DataState state={state} empty={!summary}>{summary ? <>
     <Card className="border-binu-line bg-[linear-gradient(145deg,#E7F1FB_0%,#FFFFFF_72%)] shadow-[0_18px_50px_rgba(46,75,102,0.08)]"><CardContent className="grid grid-cols-[60px_1fr_auto] items-center gap-4"><div className="grid size-15 place-items-center rounded-full border-4 border-white bg-binu-sky text-lg font-black text-binu-navy shadow-sm">{summary.profile.avatarText}</div><div><p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-binu-muted">My Binu</p><h1 className="mt-2 text-xl font-black tracking-[-0.03em] text-binu-ink">{summary.profile.name}님의 비누 기록</h1><p className="mt-2 text-xs font-medium leading-6 text-binu-text">서버에 남은 작은 기록까지 차곡차곡 모아둘게요.</p></div><Button variant="quiet" size="icon-lg" type="button" aria-label="프로필 수정" onClick={onProfile}><Pencil size={18} aria-hidden="true" /></Button></CardContent></Card>
     <div className="mt-3 grid grid-cols-2 gap-2"><InfoTile value={summary.stats.monthlyCompletionCount} label="이번 달 완료" /><InfoTile value={summary.stats.categoryCount} label="사용 중인 주기" /><InfoTile value={summary.stats.savedSelectionCount} label="담은 비누 픽" /><InfoTile value={savedCommunityCount} label="저장한 글" /></div>
     <section className="mt-9"><div className="mb-4 flex items-end justify-between gap-3"><h2 className="text-xl font-black tracking-[-0.03em] text-binu-ink">최근 12주</h2><span className="text-xs font-bold text-binu-muted">서버 주간 완료 기록</span></div><Card className="border-binu-line bg-white shadow-none"><CardContent className="grid grid-cols-12 gap-1.5">{summary.weeklyFootprints.map((footprint, index) => <span title={`${footprint.weekStartDate}: ${footprint.completionCount}회`} className={cn("aspect-square rounded-[4px] bg-binu-mist", footprint.level === 1 && "bg-[#D8ECF9]", footprint.level === 2 && "bg-binu-sky", footprint.level === 3 && "bg-binu-navy", index === summary.weeklyFootprints.length - 1 && "outline-2 outline-offset-2 outline-binu-navy")} key={footprint.weekStartDate} />)}</CardContent></Card></section>
     <section className="mt-9"><div className="mb-4"><h2 className="text-xl font-black tracking-[-0.03em] text-binu-ink">비누 노트와 설정</h2></div><Card className="gap-0 border-binu-line bg-white py-0 shadow-none"><MenuRow icon={History} label="비누 기록" detail={`이번 달 ${summary.stats.monthlyCompletionCount}개`} onClick={onHistory} /><MenuRow icon={BookmarkCheck} label="저장한 비누 픽" detail={`${summary.stats.savedSelectionCount}개 담김`} onClick={onSaved} /><MenuRow icon={MessageSquareHeart} label="저장한 커뮤니티" detail="서버에서 조회" onClick={onSavedCommunity} /><MenuRow icon={CalendarClock} label="주기 관리" detail={`${summary.stats.categoryCount}개 사용 중`} onClick={onManageCycle} /></Card></section>
+    <div className="mt-5 flex justify-end pr-1"><button className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[10px] font-extrabold uppercase text-binu-muted/45 transition hover:bg-white hover:text-[#B94A48] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-binu-sky/50 disabled:opacity-40" type="button" aria-label="시드 데이터 복구" disabled={resetBusy} onClick={onResetDemoData}><RefreshCcw className={cn("size-3", resetBusy && "animate-spin")} aria-hidden="true" />{resetBusy ? "복구 중" : "seed reset"}</button></div>
   </> : null}</DataState></section>;
 }
 
@@ -1008,15 +1103,15 @@ function SavedSelectionList({ items, pendingId, onToggle, onDetail }: { items: S
 }
 
 function SavedCommunityList({ state, error, items, presets, onOpen }: { state: LoadState; error: string; items: CommunityPost[]; presets: CategoryPreset[]; onOpen: (id: string) => void }) {
-  return <DataState state={state} error={error} empty={!items.length}><div className="grid gap-3">{items.map((post) => <button className="grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-binu-line bg-white p-3 text-left transition hover:border-binu-sky hover:bg-binu-sky-soft/40" key={post.id} type="button" onClick={() => onOpen(post.id)}><IconTile icon={iconForLabel(post.tag, presets)} size={40} /><div className="min-w-0"><strong className="block truncate text-xs font-extrabold text-binu-ink">{post.title}</strong><span className="mt-1 block text-[10px] font-bold text-binu-muted">#{post.tag} · 도움 {post.helpfulCount} · 저장 {post.savedCount}</span></div><ChevronRight className="size-4 text-binu-muted" aria-hidden="true" /></button>)}</div></DataState>;
+  return <DataState state={state} error={error} empty={!items.length}><div className="grid gap-3">{items.map((post) => <button className="grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-binu-line bg-white p-3 text-left transition hover:border-binu-sky hover:bg-binu-sky-soft/40" key={post.id} type="button" onClick={() => onOpen(post.id)}>{post.imageUrl ? <span className="relative h-10 overflow-hidden rounded-lg bg-binu-cream"><Image src={post.imageUrl} alt="" fill sizes="40px" className="object-cover" /></span> : <IconTile icon={iconForLabel(post.tag, presets)} size={40} />}<div className="min-w-0"><strong className="block truncate text-xs font-extrabold text-binu-ink">{post.title}</strong><span className="mt-1 block text-[10px] font-bold text-binu-muted">#{post.tag} · 도움 {post.helpfulCount} · 저장 {post.savedCount}</span></div><ChevronRight className="size-4 text-binu-muted" aria-hidden="true" /></button>)}</div></DataState>;
 }
 
 function CycleManager({ categories, presets, draft, editing, busy, onToggle, onCycle }: { categories: Category[]; presets: CategoryPreset[]; draft: CycleDraft; editing: boolean; busy: boolean; onToggle: (id: string) => void; onCycle: (id: string, days: number) => void }) {
-  return <div className="grid gap-3">{presets.map((preset) => { const active = findCategoryForPreset(preset, categories); const item = draft[preset.id]; const enabled = editing ? Boolean(item?.enabled) : Boolean(active); const days = editing ? item?.cycleDays ?? preset.defaultCycle : active?.cycleDays ?? preset.defaultCycle; const canChange = editing && enabled && !busy; return <Card className={cn("border-binu-line bg-white shadow-none", enabled && "border-binu-sky bg-[linear-gradient(135deg,#FFFFFF,#E7F1FB)]")} key={preset.id}><CardContent className="grid grid-cols-[42px_1fr_auto] items-start gap-3"><IconTile icon={preset.icon} size={42} /><div className="min-w-0"><strong className="block text-sm font-extrabold text-binu-ink">{preset.name}</strong><span className="mt-1 block text-[10px] font-medium leading-5 text-binu-muted">{active ? "서버에 저장됨" : enabled ? "저장하면 서버에 추가됨" : "아직 추가되지 않음"} · {days}일 주기 · {preset.note}</span>{editing && enabled ? <div className="mt-3 grid grid-cols-[28px_1fr_28px] items-center gap-1.5"><Button variant="quiet" size="icon-sm" type="button" aria-label={`${preset.name} 주기 줄이기`} disabled={!canChange || days === ALLOWED_CYCLE_DAYS[0]} onClick={() => onCycle(preset.id, stepCycleDays(days, -1))}><Minus size={15} aria-hidden="true" /></Button><div className="grid grid-cols-5 gap-1" role="group" aria-label={`${preset.name} 주기 선택`}>{ALLOWED_CYCLE_DAYS.map((value) => <Button key={value} className="px-0" variant={value === days ? "binu" : "quiet"} size="icon-sm" type="button" disabled={!canChange} onClick={() => onCycle(preset.id, value)}>{value}</Button>)}</div><Button variant="quiet" size="icon-sm" type="button" aria-label={`${preset.name} 주기 늘리기`} disabled={!canChange || days === ALLOWED_CYCLE_DAYS[ALLOWED_CYCLE_DAYS.length - 1]} onClick={() => onCycle(preset.id, stepCycleDays(days, 1))}><Plus size={15} aria-hidden="true" /></Button></div> : null}</div><button className={cn("relative h-[22px] w-[38px] rounded-full bg-binu-mist transition disabled:opacity-70", enabled && "bg-binu-navy")} type="button" role="switch" aria-checked={enabled} aria-label={`${preset.name} ${enabled ? "사용 중" : "추가"}`} disabled={!editing || Boolean(active) || busy} onClick={() => onToggle(preset.id)}><span className={cn("absolute left-[3px] top-[3px] size-4 rounded-full bg-white shadow-sm transition", enabled && "translate-x-4")} /></button></CardContent></Card>; })}</div>;
+  return <div className="grid gap-3">{presets.map((preset) => { const active = findCategoryForPreset(preset, categories); const item = draft[preset.id]; const enabled = editing ? Boolean(item?.enabled) : Boolean(active); const days = editing ? item?.cycleDays ?? preset.defaultCycle : active?.cycleDays ?? preset.defaultCycle; const canChange = editing && enabled && !busy; const stateText = active ? enabled ? "서버에 저장됨" : "저장하면 꺼짐" : enabled ? "저장하면 서버에 추가됨" : "아직 추가되지 않음"; return <Card className={cn("border-binu-line bg-white shadow-none", enabled && "border-binu-sky bg-[linear-gradient(135deg,#FFFFFF,#E7F1FB)]", editing && !enabled && "bg-white/70")} key={preset.id}><CardContent className="grid grid-cols-[42px_1fr_auto] items-start gap-3"><IconTile icon={preset.icon} size={42} /><div className="min-w-0"><strong className="block text-sm font-extrabold text-binu-ink">{preset.name}</strong><span className="mt-1 block text-[10px] font-medium leading-5 text-binu-muted">{stateText} · {days}일 주기 · {preset.note}</span>{editing && enabled ? <div className="mt-3 grid grid-cols-[28px_1fr_28px] items-center gap-1.5"><Button variant="quiet" size="icon-sm" type="button" aria-label={`${preset.name} 주기 줄이기`} disabled={!canChange || days === ALLOWED_CYCLE_DAYS[0]} onClick={() => onCycle(preset.id, stepCycleDays(days, -1))}><Minus size={15} aria-hidden="true" /></Button><div className="grid grid-cols-5 gap-1" role="group" aria-label={`${preset.name} 주기 선택`}>{ALLOWED_CYCLE_DAYS.map((value) => <Button key={value} className="px-0" variant={value === days ? "binu" : "quiet"} size="icon-sm" type="button" disabled={!canChange} onClick={() => onCycle(preset.id, value)}>{value}</Button>)}</div><Button variant="quiet" size="icon-sm" type="button" aria-label={`${preset.name} 주기 늘리기`} disabled={!canChange || days === ALLOWED_CYCLE_DAYS[ALLOWED_CYCLE_DAYS.length - 1]} onClick={() => onCycle(preset.id, stepCycleDays(days, 1))}><Plus size={15} aria-hidden="true" /></Button></div> : null}</div><button className={cn("relative h-[22px] w-[38px] rounded-full bg-binu-mist transition disabled:opacity-70", enabled && "bg-binu-navy")} type="button" role="switch" aria-checked={enabled} aria-label={`${preset.name} ${enabled ? "끄기" : "켜기"}`} disabled={!editing || busy} onClick={() => onToggle(preset.id)}><span className={cn("absolute left-[3px] top-[3px] size-4 rounded-full bg-white shadow-sm transition", enabled && "translate-x-4")} /></button></CardContent></Card>; })}</div>;
 }
 
 function SelectionDetail({ state, error, item, pending, onToggle, onExternal }: { state: LoadState; error: string; item: Selection | null; pending: boolean; onToggle: (item: Selection) => void; onExternal: (item: Selection, providerId?: string) => void }) {
-  return <DataState state={state} error={error} empty={!item}>{item ? <div className="grid gap-3"><Card className="border-binu-line bg-white shadow-none"><CardContent className="grid grid-cols-[48px_1fr] items-center gap-3"><IconTile icon={item.icon} /><div className="min-w-0"><strong className="block text-sm font-extrabold text-binu-ink">{item.title}</strong><span className="mt-1 block text-xs font-bold text-binu-navy">{item.price}</span></div></CardContent></Card><div className="grid grid-cols-3 gap-2"><DetailMetric label="가격" value={item.price} /><DetailMetric label="후기" value={`${item.rating} · ${item.reviews}`} icon={<Star className="size-3 fill-[#F2C35E] text-[#F2C35E]" aria-hidden="true" />} /><DetailMetric label="연결 정보" value={item.affiliate} /></div><InfoBlock title="추천 이유">{item.reason}</InfoBlock><InfoBlock title="맞는 상황">{item.fitFor}</InfoBlock><Card size="sm" className="border-binu-line bg-background shadow-none"><CardHeader><CardTitle className="text-xs font-extrabold text-binu-navy">확인할 점</CardTitle></CardHeader><CardContent>{item.checks.length ? <ul className="list-disc space-y-1 pl-4 text-xs leading-6 text-binu-text">{item.checks.map((check) => <li key={check}>{check}</li>)}</ul> : <p className="text-xs text-binu-muted">서버에 등록된 확인 항목이 없습니다.</p>}</CardContent></Card>{item.notice ? <InfoBlock title="외부 보기 고지">{item.notice}</InfoBlock> : null}{item.providers.length ? <Card size="sm" className="border-binu-line bg-background shadow-none"><CardHeader><CardTitle className="text-xs font-extrabold text-binu-navy">제공처</CardTitle></CardHeader><CardContent className="grid gap-2">{item.providers.map((provider) => <button className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-binu-line bg-white p-3 text-left" key={provider.id} type="button" onClick={() => onExternal(item, provider.id)}><span className="min-w-0"><strong className="block text-xs text-binu-ink">{provider.name}</strong><small className="text-[10px] text-binu-muted">{provider.note}</small></span><strong className="text-[10px] text-binu-navy">{provider.priceText}</strong><ExternalLink size={16} aria-hidden="true" /></button>)}</CardContent></Card> : null}<div className="grid grid-cols-2 gap-2"><Button variant={item.saved ? "binu-soft" : "quiet"} type="button" disabled={pending} onClick={() => onToggle(item)}>{item.saved ? <BookmarkCheck size={16} aria-hidden="true" /> : <Bookmark size={16} aria-hidden="true" />}{item.saved ? "담김" : "담기"}</Button><Button variant="binu" type="button" onClick={() => onExternal(item)}><ExternalLink size={16} aria-hidden="true" />외부 보기</Button></div></div> : null}</DataState>;
+  return <DataState state={state} error={error} empty={!item}>{item ? <div className="grid gap-3">{item.imageUrl ? <div className="relative aspect-video overflow-hidden rounded-lg bg-binu-cream"><Image src={item.imageUrl} alt="" fill sizes="360px" className="object-cover" /></div> : null}<Card className="border-binu-line bg-white shadow-none"><CardContent className="grid grid-cols-[48px_1fr] items-center gap-3"><IconTile icon={item.icon} /><div className="min-w-0"><strong className="block text-sm font-extrabold text-binu-ink">{item.title}</strong><span className="mt-1 block text-xs font-bold text-binu-navy">{item.price}</span></div></CardContent></Card><div className="grid grid-cols-3 gap-2"><DetailMetric label="가격" value={item.price} /><DetailMetric label="후기" value={`${item.rating} · ${item.reviews}`} icon={<Star className="size-3 fill-[#F2C35E] text-[#F2C35E]" aria-hidden="true" />} /><DetailMetric label="연결 정보" value={item.affiliate} /></div><InfoBlock title="추천 이유">{item.reason}</InfoBlock><InfoBlock title="맞는 상황">{item.fitFor}</InfoBlock><Card size="sm" className="border-binu-line bg-background shadow-none"><CardHeader><CardTitle className="text-xs font-extrabold text-binu-navy">확인할 점</CardTitle></CardHeader><CardContent>{item.checks.length ? <ul className="list-disc space-y-1 pl-4 text-xs leading-6 text-binu-text">{item.checks.map((check) => <li key={check}>{check}</li>)}</ul> : <p className="text-xs text-binu-muted">서버에 등록된 확인 항목이 없습니다.</p>}</CardContent></Card>{item.notice ? <InfoBlock title="외부 보기 고지">{item.notice}</InfoBlock> : null}{item.providers.length ? <Card size="sm" className="border-binu-line bg-background shadow-none"><CardHeader><CardTitle className="text-xs font-extrabold text-binu-navy">제공처</CardTitle></CardHeader><CardContent className="grid gap-2">{item.providers.map((provider) => <button className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-binu-line bg-white p-3 text-left" key={provider.id} type="button" onClick={() => onExternal(item, provider.id)}><span className="min-w-0"><strong className="block text-xs text-binu-ink">{provider.name}</strong><small className="text-[10px] text-binu-muted">{provider.note}</small></span><strong className="text-[10px] text-binu-navy">{provider.priceText}</strong><ExternalLink size={16} aria-hidden="true" /></button>)}</CardContent></Card> : null}<div className="grid grid-cols-2 gap-2"><Button variant={item.saved ? "binu-soft" : "quiet"} type="button" disabled={pending} onClick={() => onToggle(item)}>{item.saved ? <BookmarkCheck size={16} aria-hidden="true" /> : <Bookmark size={16} aria-hidden="true" />}{item.saved ? "담김" : "담기"}</Button><Button variant="binu" type="button" onClick={() => onExternal(item)}><ExternalLink size={16} aria-hidden="true" />외부 보기</Button></div></div> : null}</DataState>;
 }
 
 function CommunityComposer({ tab, tags, presets, busy, onSubmit }: { tab: CommunityTab; tags: string[]; presets: CategoryPreset[]; busy: boolean; onSubmit: (input: { title: string; tag: string; body: string }) => void }) {

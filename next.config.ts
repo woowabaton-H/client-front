@@ -23,6 +23,12 @@ const nextConfig: NextConfig = {
           destination: `${backendOrigin()}/api/v1/:path*`,
         },
       ],
+      afterFiles: [
+        {
+          source: "/cleanloop/:path*",
+          destination: `${backendOrigin()}/cleanloop/:path*`,
+        },
+      ],
     };
   },
 };

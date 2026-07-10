@@ -146,6 +146,7 @@ export type ApiCommunityPostSummary = {
   title: string;
   tag: string;
   bodyPreview: string;
+  imageUrl: string | null;
   helpfulCount: number;
   commentsCount: number;
   answersCount: number;
@@ -161,6 +162,7 @@ export type ApiCommunityPostDetail = {
   title: string;
   tag: string;
   body: string;
+  imageUrl: string | null;
   helpfulCount: number;
   commentsCount: number;
   answersCount: number;
@@ -218,6 +220,12 @@ export type ApiMeSummary = {
 export type ApiUser = ApiProfile & {
   timezone: string;
   createdAt: string;
+};
+
+export type ApiDemoDataReset = {
+  message: string;
+  scripts: string[];
+  tableCounts: Record<string, number>;
 };
 
 type QueryValue = string | number | undefined | null;
@@ -281,6 +289,9 @@ export function updateCategoryCycle(categoryId: string, cycleDays: number) {
     body: JSON.stringify({ cycleDays }),
   });
 }
+
+export const deleteCategory = (categoryId: string) =>
+  requestData<void>(`/api/v1/categories/${categoryId}`, { method: "DELETE" });
 
 export function completeCategoryById(categoryId: string) {
   return requestData<ApiCompleteCategoryResult>(`/api/v1/categories/${categoryId}/complete`, {
@@ -361,3 +372,6 @@ export const unsaveCommunityPost = (postId: string) =>
 export const getMe = () => requestData<ApiUser>("/api/v1/me");
 export const updateMe = (input: { name?: string; avatarText?: string }) =>
   requestData<ApiUser>("/api/v1/me", { method: "PATCH", body: JSON.stringify(input) });
+
+export const resetDemoDataToSeed = () =>
+  requestData<ApiDemoDataReset>("/api/v1/admin/demo-data/reset", { method: "POST", body: JSON.stringify({}) });

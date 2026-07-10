@@ -63,6 +63,7 @@ export type CommunityPost = {
   title: string;
   tag: string;
   body: string;
+  imageUrl: string | null;
   helpfulCount: number;
   replyCount: number;
   savedCount: number;
@@ -145,6 +146,7 @@ export function mapCommunitySummary(post: ApiCommunityPostSummary): CommunityPos
     title: post.title,
     tag: post.tag,
     body: post.bodyPreview,
+    imageUrl: post.imageUrl,
     helpfulCount: post.helpfulCount,
     replyCount: post.type === "qa" ? post.answersCount : post.commentsCount,
     savedCount: post.savedCount,
@@ -162,6 +164,7 @@ export function mapCommunityDetail(post: ApiCommunityPostDetail): CommunityPost 
     title: post.title,
     tag: post.tag,
     body: post.body,
+    imageUrl: post.imageUrl,
     helpfulCount: post.helpfulCount,
     replyCount: post.type === "qa" ? post.answersCount : post.commentsCount,
     savedCount: post.savedCount,

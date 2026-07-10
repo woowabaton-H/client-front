@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { ArrowUpRight, Bookmark, BookmarkCheck, MapPin, ShieldCheck, Star } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ type ServiceCardProps = {
   review: string;
   rating?: string;
   source?: string;
+  imageSrc?: string | null;
   tags?: string[];
   saved?: boolean;
   onSave?: () => void;
@@ -35,6 +37,7 @@ export function ServiceCard({
   review,
   rating,
   source,
+  imageSrc,
   tags = [],
   saved = false,
   onSave,
@@ -50,8 +53,12 @@ export function ServiceCard({
     >
       <CardHeader>
         <div className="flex items-start gap-3">
-          <div className="grid size-11 shrink-0 place-items-center rounded-lg bg-white text-binu-navy ring-1 ring-binu-line">
-            <ShieldCheck className="size-5" />
+          <div className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-white text-binu-navy ring-1 ring-binu-line">
+            {imageSrc ? (
+              <Image src={imageSrc} alt="" fill sizes="56px" className="object-cover" />
+            ) : (
+              <ShieldCheck className="size-5" />
+            )}
           </div>
           <div>
             <StatusBadge tone="service">필요할 땐 연결</StatusBadge>
